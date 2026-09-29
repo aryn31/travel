@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { SiteHeader } from "@/components/SiteHeader";
+import { SiteFooter } from "@/components/SiteFooter";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -27,8 +28,18 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       {/* pt-16 clears the fixed header on every page; the home hero cancels
           it with -mt-16 so the landscape runs behind the header. */}
       <body className="min-h-full flex flex-col pt-16">
+        {/* First tab stop: lets keyboard users jump the nav on every page. */}
+        <a
+          href="#main"
+          className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[60] focus:rounded-full focus:bg-foreground focus:px-4 focus:py-2 focus:text-background"
+        >
+          Skip to content
+        </a>
         <SiteHeader />
-        {children}
+        <div id="main" className="contents">
+          {children}
+        </div>
+        <SiteFooter />
       </body>
     </html>
   );

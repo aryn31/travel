@@ -23,10 +23,10 @@ function Button({
       aria-label={label}
       aria-pressed={active}
       title={label}
-      className={`rounded px-2 py-1 text-sm transition-colors disabled:opacity-30 ${
+      className={`inline-flex h-8 min-w-8 items-center justify-center rounded-md px-2 text-sm transition-colors disabled:opacity-30 ${
         active
           ? "bg-foreground text-background"
-          : "hover:bg-black/5 dark:hover:bg-white/10"
+          : "text-muted hover:bg-surface-hover hover:text-foreground"
       }`}
     >
       {children}
@@ -38,10 +38,12 @@ export function Toolbar({
   editor,
   onPickImage,
   uploading,
+  words,
 }: {
   editor: Editor;
   onPickImage: () => void;
   uploading: boolean;
+  words: number;
 }) {
   function setLink() {
     const previous = editor.getAttributes("link").href as string | undefined;
@@ -63,7 +65,9 @@ export function Toolbar({
   }
 
   return (
-    <div className="sticky top-0 z-10 -mx-6 mb-6 flex flex-wrap items-center gap-0.5 border-b border-black/10 bg-background/90 px-6 py-2 backdrop-blur dark:border-white/15">
+    // Sticky under the fixed header so formatting stays reachable in a long
+    // story without hunting for the top of the page.
+    <div className="sticky top-16 z-20 -mx-6 mb-8 flex flex-wrap items-center gap-0.5 border-y border-rule bg-background/95 px-6 py-2 backdrop-blur-xl">
       <Button
         label="Heading"
         active={editor.isActive("heading", { level: 2 })}
@@ -134,10 +138,16 @@ export function Toolbar({
       <Button label="Insert image" onClick={onPickImage} disabled={uploading}>
         {uploading ? "Uploading…" : "Image"}
       </Button>
+
+      {words > 0 && (
+        <span className="ml-auto hidden text-xs tabular-nums text-faint sm:block">
+          {words.toLocaleString()} {words === 1 ? "word" : "words"}
+        </span>
+      )}
     </div>
   );
 }
 
 function Divider() {
-  return <span aria-hidden className="mx-1.5 h-5 w-px bg-black/10 dark:bg-white/15" />;
+  return <span aria-hidden className="mx-1.5 h-5 w-px bg-rule" />;
 }

@@ -7,6 +7,7 @@ import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
 import { uploadImage } from "@/lib/upload-client";
+import { docToText } from "@/lib/story-doc";
 import { StoryImage } from "./extensions";
 import { Toolbar } from "./Toolbar";
 import {
@@ -30,6 +31,10 @@ type SaveState =
 type Upload = { id: string; name: string; progress: number };
 
 const AUTOSAVE_MS = 1200;
+
+function countWords(text: string): number {
+  return text.trim().split(/\s+/).filter(Boolean).length;
+}
 
 export function Editor({
   storyId,
@@ -66,6 +71,9 @@ export function Editor({
   // Toolbar state (which mark is active, what's selected) lives in the editor,
   // not in React -- re-render on each transaction so the buttons stay honest.
   const [, bumpToolbar] = useReducer((n: number) => n + 1, 0);
+  // Seeded from the loaded document rather than synced in an effect, which
+  // would cost an extra render on every mount.
+  const [words, setWords] = useState(() => countWords(docToText(initialDoc)));
 
   const editor = useEditor({
     // Required under SSR: rendering immediately would mismatch hydration.
@@ -108,7 +116,10 @@ export function Editor({
         return true;
       },
     },
-    onUpdate: () => schedule(),
+    onUpdate: ({ editor: e }) => {
+      setWords(countWords(e.getText()));
+      schedule();
+    },
     onSelectionUpdate: () => bumpToolbar(),
     onTransaction: () => bumpToolbar(),
   });
@@ -213,6 +224,7 @@ export function Editor({
     [],
   );
 
+
   async function onPublish() {
     setPublishError(null);
     await flush();
@@ -226,7 +238,7 @@ export function Editor({
 
   return (
     <div className="mx-auto w-full max-w-2xl flex-1 px-6 py-10">
-      <div className="mb-6 flex items-center justify-between gap-4 text-sm">
+      <div className="mb-8 flex items-center justify-between gap-4 text-sm">
         <StatusLine state={save} status={status} publicUrl={publicUrl} />
         <div className="flex items-center gap-3">
           {status === "draft" ? (
@@ -234,7 +246,7 @@ export function Editor({
               type="button"
               onClick={() => void onPublish()}
               disabled={pending || uploads.length > 0}
-              className="rounded-lg bg-foreground px-3.5 py-1.5 font-medium text-background hover:opacity-85 disabled:opacity-50"
+              className="rounded-full bg-foreground px-4 py-1.5 font-medium text-background transition-opacity hover:opacity-85 disabled:opacity-40"
             >
               Publish
             </button>
@@ -249,7 +261,7 @@ export function Editor({
                 })
               }
               disabled={pending}
-              className="rounded-lg border border-black/15 px-3.5 py-1.5 hover:bg-black/5 disabled:opacity-50 dark:border-white/20 dark:hover:bg-white/10"
+              className="rounded-full border border-rule px-4 py-1.5 transition-colors hover:bg-surface-hover disabled:opacity-40"
             >
               Unpublish
             </button>
@@ -298,6 +310,7 @@ export function Editor({
           editor={editor}
           onPickImage={() => fileInput.current?.click()}
           uploading={uploads.length > 0}
+          words={words}
         />
       )}
 
@@ -307,10 +320,10 @@ export function Editor({
         <ul className="mt-6 space-y-2" aria-live="polite">
           {uploads.map((u) => (
             <li key={u.id} className="text-sm">
-              <span className="opacity-60">{u.name}</span>
-              <span className="mt-1 block h-1 overflow-hidden rounded bg-black/10 dark:bg-white/15">
+              <span className="text-muted">{u.name}</span>
+              <span className="mt-1 block h-1 overflow-hidden rounded-full bg-rule">
                 <span
-                  className="block h-full bg-foreground transition-[width]"
+                  className="block h-full rounded-full bg-accent transition-[width]"
                   style={{ width: `${Math.round(u.progress * 100)}%` }}
                 />
               </span>
@@ -319,7 +332,7 @@ export function Editor({
         </ul>
       )}
 
-      <p className="mt-8 text-xs opacity-40">
+      <p className="mt-10 text-xs text-faint">
         Drag photos in, or paste them. They&apos;re resized to 2560px before
         upload.
       </p>
@@ -365,7 +378,7 @@ function CoverPicker({
       <button
         type="button"
         onClick={onPick}
-        className="mb-6 w-full rounded-lg border border-dashed border-black/20 py-4 text-sm opacity-60 hover:opacity-100 dark:border-white/25"
+        className="mb-8 w-full rounded-xl border border-dashed border-rule py-5 text-sm text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
       >
         Add a cover image
       </button>
@@ -378,7 +391,7 @@ function CoverPicker({
       <img
         src={cover.url}
         alt=""
-        className="h-48 w-full rounded-lg object-cover"
+        className="h-56 w-full rounded-xl object-cover"
       />
       <div className="mt-2 flex gap-4 text-sm">
         <button type="button" onClick={onPick} className="underline opacity-60 hover:opacity-100">
@@ -416,7 +429,7 @@ function StatusLine({
 
   return (
     <p
-      className={state.kind === "error" ? "text-red-600 dark:text-red-400" : "opacity-50"}
+      className={state.kind === "error" ? "text-red-600 dark:text-red-400" : "text-muted"}
       aria-live="polite"
     >
       {label}
@@ -442,7 +455,7 @@ function DeleteButton({ storyId, disabled }: { storyId: string; disabled: boolea
         type="button"
         onClick={() => setArmed(true)}
         disabled={disabled}
-        className="opacity-50 hover:text-red-600 hover:opacity-100 disabled:opacity-30"
+        className="rounded-full px-3 py-1.5 text-muted transition-colors hover:bg-red-600/10 hover:text-red-600 disabled:opacity-30 dark:hover:text-red-400"
       >
         Delete
       </button>

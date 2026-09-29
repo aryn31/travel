@@ -2,9 +2,12 @@ import Link from "next/link";
 import { desc, eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
-import { stories } from "@/lib/db/schema";
+import { media, stories } from "@/lib/db/schema";
 import { getViewer } from "@/lib/session";
+import { publicUrl } from "@/lib/storage";
 import { excerpt } from "@/lib/story-doc";
+import { ButtonLink } from "@/components/ui/Button";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 export const metadata = { title: "Your stories" };
 
@@ -14,106 +17,152 @@ export default async function DraftsPage() {
   if (!viewer.profile) redirect("/onboarding");
 
   const rows = await db
-    .select()
+    .select({ story: stories, cover: media })
     .from(stories)
+    .leftJoin(media, eq(media.id, stories.coverMediaId))
     .where(eq(stories.authorId, viewer.userId))
     .orderBy(desc(stories.updatedAt));
 
-  const drafts = rows.filter((s) => s.status === "draft");
-  const published = rows.filter((s) => s.status !== "draft");
+  const drafts = rows.filter((r) => r.story.status === "draft");
+  const published = rows.filter((r) => r.story.status !== "draft");
+  const handle = viewer.profile.handle;
 
   return (
-    <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-12">
-      <div className="mb-10 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold tracking-tight">Your stories</h1>
-        <Link
-          href="/write"
-          className="rounded-lg bg-foreground px-3.5 py-2 text-sm font-medium text-background hover:opacity-85"
-        >
-          New story
-        </Link>
+    <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-12 pb-24">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-semibold tracking-tight">Your stories</h1>
+          <p className="mt-1.5 text-sm text-muted">
+            {published.length} published · {drafts.length}{" "}
+            {drafts.length === 1 ? "draft" : "drafts"}
+          </p>
+        </div>
+        <ButtonLink href="/write">New story</ButtonLink>
       </div>
 
-      {rows.length === 0 && (
-        <p className="opacity-60">
-          Nothing yet.{" "}
-          <Link href="/write" className="underline">
-            Start your first story
-          </Link>
-          .
-        </p>
+      {rows.length === 0 ? (
+        <div className="mt-12">
+          <EmptyState title="Nothing here yet">
+            Every story starts as a private draft.{" "}
+            <Link href="/write" className="text-accent underline underline-offset-2">
+              Start your first
+            </Link>
+            .
+          </EmptyState>
+        </div>
+      ) : (
+        <div className="mt-12 space-y-14">
+          <Section title="Drafts" count={drafts.length} empty="No drafts right now.">
+            {drafts.map(({ story, cover }) => (
+              <StoryRow
+                key={story.id}
+                href={`/write/${story.id}`}
+                story={story}
+                cover={cover}
+              />
+            ))}
+          </Section>
+
+          <Section
+            title="Published"
+            count={published.length}
+            empty="Nothing published yet."
+          >
+            {published.map(({ story, cover }) => (
+              <StoryRow
+                key={story.id}
+                href={`/@${handle}/${story.slug}`}
+                editHref={`/write/${story.id}`}
+                story={story}
+                cover={cover}
+              />
+            ))}
+          </Section>
+        </div>
       )}
-
-      <Section title="Drafts" empty="No drafts.">
-        {drafts.map((s) => (
-          <Row key={s.id} href={`/write/${s.id}`} story={s} />
-        ))}
-      </Section>
-
-      <Section title="Published" empty="Nothing published yet.">
-        {published.map((s) => (
-          <Row
-            key={s.id}
-            href={`/@${viewer.profile!.handle}/${s.slug}`}
-            story={s}
-            editHref={`/write/${s.id}`}
-          />
-        ))}
-      </Section>
     </main>
   );
 }
 
 function Section({
   title,
+  count,
   empty,
   children,
 }: {
   title: string;
+  count: number;
   empty: string;
   children: React.ReactNode[];
 }) {
   return (
-    <section className="mb-12">
-      <h2 className="mb-4 text-xs font-medium uppercase tracking-wider opacity-40">
+    <section>
+      <h2 className="mb-1 flex items-baseline gap-2 text-xs font-medium uppercase tracking-[0.2em] text-muted">
         {title}
+        <span className="text-faint">{count}</span>
       </h2>
       {children.length === 0 ? (
-        <p className="text-sm opacity-40">{empty}</p>
+        <p className="py-5 text-sm text-faint">{empty}</p>
       ) : (
-        <ul className="divide-y divide-black/10 dark:divide-white/15">
-          {children}
-        </ul>
+        <ul className="divide-y divide-rule">{children}</ul>
       )}
     </section>
   );
 }
 
-function Row({
+function StoryRow({
   href,
-  story,
   editHref,
+  story,
+  cover,
 }: {
   href: string;
-  story: { title: string; bodyText: string; readingMinutes: number; updatedAt: Date };
   editHref?: string;
+  story: {
+    title: string;
+    bodyText: string;
+    readingMinutes: number;
+    updatedAt: Date;
+    status: string;
+  };
+  cover: { storageKey: string; width: number; height: number } | null;
 }) {
   return (
-    <li className="flex items-baseline justify-between gap-4 py-3">
-      <Link href={href} className="min-w-0 flex-1 group">
-        <span className="block font-medium group-hover:underline">
+    <li className="group flex items-center gap-4 py-4">
+      {cover ? (
+        // eslint-disable-next-line @next/next/no-img-element -- see StoryBody
+        <img
+          src={publicUrl(cover.storageKey)}
+          alt=""
+          width={cover.width}
+          height={cover.height}
+          className="size-14 shrink-0 rounded-lg bg-rule object-cover"
+        />
+      ) : (
+        <span
+          aria-hidden
+          className="size-14 shrink-0 rounded-lg border border-dashed border-rule"
+        />
+      )}
+
+      <Link href={href} className="min-w-0 flex-1">
+        <span className="block truncate font-medium group-hover:underline">
           {story.title.trim() || "Untitled"}
         </span>
-        <span className="mt-0.5 block truncate text-sm opacity-50">
+        <span className="mt-0.5 block truncate text-sm text-muted">
           {excerpt(story.bodyText, 90) || "Empty"}
         </span>
+        <span className="mt-1 block text-xs text-faint">
+          {story.readingMinutes > 0 && `${story.readingMinutes} min · `}
+          Edited {story.updatedAt.toLocaleDateString()}
+        </span>
       </Link>
-      <span className="shrink-0 text-xs opacity-40">
-        {story.readingMinutes > 0 && `${story.readingMinutes} min · `}
-        {story.updatedAt.toLocaleDateString()}
-      </span>
+
       {editHref && (
-        <Link href={editHref} className="shrink-0 text-xs underline opacity-50 hover:opacity-100">
+        <Link
+          href={editHref}
+          className="shrink-0 rounded-full px-3 py-1.5 text-sm text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
+        >
           Edit
         </Link>
       )}

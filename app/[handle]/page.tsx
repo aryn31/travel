@@ -6,6 +6,9 @@ import { media, profiles, stories } from "@/lib/db/schema";
 import { getViewer } from "@/lib/session";
 import { publicUrl } from "@/lib/storage";
 import { StoryList } from "@/components/StoryList";
+import { Avatar } from "@/components/ui/Avatar";
+import { ButtonLink } from "@/components/ui/Button";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 async function loadProfile(segment: string) {
   const raw = decodeURIComponent(segment);
@@ -77,41 +80,75 @@ export default async function ProfilePage({ params }: PageProps<"/[handle]">) {
   }));
 
   return (
-    <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-12">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-semibold tracking-tight">
-            {profile.displayName}
-          </h1>
-          <p className="mt-1 opacity-60">@{profile.handle}</p>
+    <main className="flex-1">
+      <header className="border-b border-rule bg-surface">
+        <div className="mx-auto w-full max-w-3xl px-6 py-12 sm:py-16">
+          <div className="flex flex-wrap items-start justify-between gap-6">
+            <div className="flex items-center gap-5">
+              <Avatar name={profile.displayName} handle={profile.handle} size="lg" />
+              <div className="min-w-0">
+                <h1 className="text-3xl font-semibold tracking-tight">
+                  {profile.displayName}
+                </h1>
+                <p className="mt-1 text-muted">@{profile.handle}</p>
+              </div>
+            </div>
+            {isMe && (
+              <ButtonLink href="/drafts" variant="secondary" size="sm">
+                Your stories
+              </ButtonLink>
+            )}
+          </div>
+
+          {profile.bio && (
+            <p className="mt-6 max-w-prose leading-relaxed">{profile.bio}</p>
+          )}
+
+          <dl className="mt-6 flex flex-wrap gap-x-7 gap-y-2 text-sm text-muted">
+            <div className="flex gap-1.5">
+              <dt className="sr-only">Stories published</dt>
+              <dd className="font-medium text-foreground">{published.length}</dd>
+              <span>{published.length === 1 ? "story" : "stories"}</span>
+            </div>
+            {profile.homeCountry && (
+              <div className="flex gap-1.5">
+                <dt className="sr-only">Based in</dt>
+                <dd>Based in {profile.homeCountry}</dd>
+              </div>
+            )}
+            <div className="flex gap-1.5">
+              <dt className="sr-only">Joined</dt>
+              <dd>
+                Joined{" "}
+                {profile.createdAt.toLocaleDateString(undefined, {
+                  month: "long",
+                  year: "numeric",
+                })}
+              </dd>
+            </div>
+          </dl>
         </div>
-        {isMe && (
-          <Link href="/drafts" className="shrink-0 text-sm underline opacity-60 hover:opacity-100">
-            Your stories
-          </Link>
+      </header>
+
+      <div className="mx-auto w-full max-w-3xl px-6 py-10 pb-24">
+        {published.length === 0 ? (
+          <EmptyState title={isMe ? "Nothing published yet" : "No stories yet"}>
+            {isMe ? (
+              <>
+                Drafts stay private until you publish them.{" "}
+                <Link href="/write" className="text-accent underline underline-offset-2">
+                  Write your first story
+                </Link>
+                .
+              </>
+            ) : (
+              <>Check back another time.</>
+            )}
+          </EmptyState>
+        ) : (
+          <StoryList stories={published} showAuthor={false} />
         )}
       </div>
-      {profile.bio && <p className="mt-4 leading-relaxed">{profile.bio}</p>}
-
-      <hr className="my-10 border-black/10 dark:border-white/15" />
-
-      {published.length === 0 ? (
-        <p className="text-sm opacity-60">
-          {isMe ? (
-            <>
-              Nothing published yet.{" "}
-              <Link href="/write" className="underline">
-                Write your first story
-              </Link>
-              .
-            </>
-          ) : (
-            "No stories yet."
-          )}
-        </p>
-      ) : (
-        <StoryList stories={published} showAuthor={false} />
-      )}
     </main>
   );
 }

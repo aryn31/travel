@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { desc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { media, profiles, stories } from "@/lib/db/schema";
@@ -6,6 +5,8 @@ import { getViewer } from "@/lib/session";
 import { publicUrl } from "@/lib/storage";
 import { StoryList } from "@/components/StoryList";
 import { HeroMountains } from "@/components/HeroMountains";
+import { ButtonLink } from "@/components/ui/Button";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 export default async function Home() {
   const viewer = await getViewer();
@@ -80,12 +81,9 @@ export default async function Home() {
           </p>
 
           <div className="mt-8 flex flex-wrap items-center gap-4">
-            <Link
-              href={cta.href}
-              className="rounded-full bg-foreground px-6 py-3 font-medium text-background transition-opacity hover:opacity-85"
-            >
+            <ButtonLink href={cta.href} size="lg">
               {cta.label}
-            </Link>
+            </ButtonLink>
             {recent.length > 0 && (
               <a
                 href="#latest"
@@ -103,10 +101,9 @@ export default async function Home() {
        * ---------------------------------------------------------------- */}
       <section id="latest" className="mx-auto w-full max-w-3xl px-6 pb-24">
         {recent.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-rule px-8 py-16 text-center">
-            <p className="text-lg">Nothing published yet.</p>
-            <p className="mt-2 text-muted">The first story could be yours.</p>
-          </div>
+          <EmptyState title="Nothing published yet">
+            The first story could be yours.
+          </EmptyState>
         ) : (
           <>
             <h2 className="mb-8 text-xs font-medium uppercase tracking-[0.2em] text-muted">

@@ -7,6 +7,8 @@ import { getViewer } from "@/lib/session";
 import { excerpt } from "@/lib/story-doc";
 import { publicUrl } from "@/lib/storage";
 import { StoryBody } from "@/components/StoryBody";
+import { Avatar } from "@/components/ui/Avatar";
+import { ButtonLink } from "@/components/ui/Button";
 
 async function load(handleSegment: string, slug: string) {
   const raw = decodeURIComponent(handleSegment);
@@ -63,46 +65,59 @@ export default async function StoryPage({
   if (story.status === "draft" && !isAuthor) notFound();
 
   return (
-    <main className="mx-auto w-full max-w-2xl flex-1 px-6 py-12">
+    <main className="mx-auto w-full max-w-2xl flex-1 px-6 py-12 pb-24">
       {isAuthor && story.status !== "published" && (
-        <div className="mb-8 flex items-center justify-between gap-4 rounded-lg border border-black/10 px-4 py-3 text-sm dark:border-white/15">
-          <span className="opacity-70">
-            This is a draft — only you can see it.
+        <div className="mb-10 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-accent/30 bg-accent-soft px-4 py-3 text-sm">
+          <span>
+            <strong className="font-medium">Draft</strong> — only you can see
+            this.
           </span>
-          <Link href={`/write/${story.id}`} className="underline">
-            Edit
+          <Link
+            href={`/write/${story.id}`}
+            className="font-medium text-accent underline underline-offset-2"
+          >
+            Continue editing
           </Link>
         </div>
       )}
 
       <article>
-        <h1 className="text-4xl font-semibold leading-tight tracking-tight">
-          {story.title || "Untitled"}
-        </h1>
+        <header>
+          <h1 className="text-balance text-4xl font-semibold leading-[1.12] tracking-tight sm:text-5xl">
+            {story.title || "Untitled"}
+          </h1>
 
-        <div className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm opacity-60">
-          <Link href={`/@${profile.handle}`} className="hover:underline">
-            {profile.displayName}
-          </Link>
-          {story.publishedAt && (
-            <>
-              <span aria-hidden>·</span>
-              <time dateTime={story.publishedAt.toISOString()}>
-                {story.publishedAt.toLocaleDateString(undefined, {
-                  year: "numeric",
-                  month: "long",
-                  day: "numeric",
-                })}
-              </time>
-            </>
-          )}
-          {story.readingMinutes > 0 && (
-            <>
-              <span aria-hidden>·</span>
-              <span>{story.readingMinutes} min read</span>
-            </>
-          )}
-        </div>
+          <div className="mt-7 flex items-center gap-3">
+            <Link href={`/@${profile.handle}`} className="shrink-0">
+              <Avatar name={profile.displayName} handle={profile.handle} />
+            </Link>
+            <div className="text-sm leading-tight">
+              <Link
+                href={`/@${profile.handle}`}
+                className="font-medium transition-colors hover:text-accent"
+              >
+                {profile.displayName}
+              </Link>
+              <p className="mt-1 flex flex-wrap items-center gap-x-2 text-muted">
+                {story.publishedAt && (
+                  <time dateTime={story.publishedAt.toISOString()}>
+                    {story.publishedAt.toLocaleDateString(undefined, {
+                      year: "numeric",
+                      month: "long",
+                      day: "numeric",
+                    })}
+                  </time>
+                )}
+                {story.readingMinutes > 0 && (
+                  <>
+                    <span aria-hidden>·</span>
+                    <span>{story.readingMinutes} min read</span>
+                  </>
+                )}
+              </p>
+            </div>
+          </div>
+        </header>
 
         {cover && (
           <figure className="mt-10 -mx-6 sm:mx-0">
@@ -112,19 +127,46 @@ export default async function StoryPage({
               alt=""
               width={cover.width}
               height={cover.height}
-              className="h-auto w-full sm:rounded-lg"
+              className="h-auto w-full sm:rounded-xl"
             />
           </figure>
         )}
 
-        <div className="mt-6">
+        <div className="mt-8">
           <StoryBody doc={story.bodyJson} />
         </div>
       </article>
 
+      {/* Author card: the end of a story is the one moment a reader is most
+          likely to want more from the same person. */}
+      <aside className="mt-16 rounded-2xl border border-rule bg-surface p-6">
+        <div className="flex items-start gap-4">
+          <Avatar name={profile.displayName} handle={profile.handle} size="md" />
+          <div className="min-w-0 flex-1">
+            <p className="text-xs uppercase tracking-[0.15em] text-muted">
+              Written by
+            </p>
+            <p className="mt-1 font-medium">{profile.displayName}</p>
+            {profile.bio && (
+              <p className="mt-2 text-sm leading-relaxed text-muted">
+                {profile.bio}
+              </p>
+            )}
+          </div>
+          <ButtonLink
+            href={`/@${profile.handle}`}
+            variant="secondary"
+            size="sm"
+            className="shrink-0"
+          >
+            More stories
+          </ButtonLink>
+        </div>
+      </aside>
+
       {isAuthor && story.status === "published" && (
-        <p className="mt-12 text-sm opacity-50">
-          <Link href={`/write/${story.id}`} className="underline">
+        <p className="mt-8 text-sm text-muted">
+          <Link href={`/write/${story.id}`} className="underline underline-offset-2">
             Edit this story
           </Link>
         </p>

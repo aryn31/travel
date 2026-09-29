@@ -1,77 +1,70 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
+import { Button } from "@/components/ui/Button";
+import { Field, inputClass } from "@/components/ui/Field";
 import { HANDLE_RULES } from "@/lib/handles";
 import { createProfile, type OnboardingState } from "./actions";
 
 const initial: OnboardingState = {};
 
-export function OnboardingForm({
-  suggestedHandle,
-}: {
-  suggestedHandle: string;
-}) {
+export function OnboardingForm({ suggestedHandle }: { suggestedHandle: string }) {
   const [state, action, pending] = useActionState(createProfile, initial);
-  const inputClass =
-    "w-full rounded-lg border border-black/15 dark:border-white/20 bg-transparent px-3 py-2.5 outline-none focus:border-black/50 dark:focus:border-white/50";
+  const [handle, setHandle] = useState(state.values?.handle ?? suggestedHandle);
+
+  const preview = handle.trim().toLowerCase().replace(/^@/, "");
 
   return (
-    <form action={action} className="flex flex-col gap-6">
-      <div className="flex flex-col gap-2">
-        <label htmlFor="handle" className="text-sm font-medium">
-          Your handle
-        </label>
+    <form action={action} className="flex flex-col gap-7">
+      <Field
+        label="Your handle"
+        htmlFor="handle"
+        error={state.field === "handle" ? state.error : null}
+        hint={HANDLE_RULES}
+      >
         <div className="flex items-center gap-2">
-          <span aria-hidden className="text-lg opacity-40">@</span>
+          <span aria-hidden className="text-lg text-faint">
+            @
+          </span>
           <input
             id="handle"
             name="handle"
-            defaultValue={state.values?.handle ?? suggestedHandle}
+            value={handle}
+            onChange={(e) => setHandle(e.target.value)}
             autoFocus
             spellCheck={false}
             autoCapitalize="none"
+            autoComplete="off"
             className={inputClass}
           />
         </div>
-        <p className="text-xs opacity-60">
-          {HANDLE_RULES}. Your stories will live at{" "}
-          <code className="rounded bg-black/5 px-1 dark:bg-white/10">
-            /@handle/story-title
-          </code>
-          .
-        </p>
-        {state.field === "handle" && state.error && (
-          <p role="alert" className="text-sm text-red-600 dark:text-red-400">
-            {state.error}
-          </p>
-        )}
-      </div>
+      </Field>
 
-      <div className="flex flex-col gap-2">
-        <label htmlFor="displayName" className="text-sm font-medium">
-          Display name
-        </label>
+      {/* Showing the URL as they type makes the handle feel like an address
+          rather than a username, which is what it actually is. */}
+      <p className="-mt-4 truncate rounded-lg bg-surface px-3.5 py-2.5 font-mono text-xs text-muted">
+        yoursite.com/<span className="text-foreground">@{preview || "handle"}</span>
+        /your-story
+      </p>
+
+      <Field
+        label="Display name"
+        htmlFor="displayName"
+        error={state.field === "displayName" ? state.error : null}
+        hint="Shown on your byline. Change it any time."
+      >
         <input
           id="displayName"
           name="displayName"
           defaultValue={state.values?.displayName ?? ""}
+          autoComplete="name"
           className={inputClass}
         />
-        <p className="text-xs opacity-60">Shown on your byline. Change it any time.</p>
-        {state.field === "displayName" && state.error && (
-          <p role="alert" className="text-sm text-red-600 dark:text-red-400">
-            {state.error}
-          </p>
-        )}
-      </div>
+      </Field>
 
-      <button
-        type="submit"
-        disabled={pending}
-        className="rounded-lg bg-foreground px-3 py-2.5 font-medium text-background transition-opacity hover:opacity-85 disabled:opacity-50"
-      >
+      <Button type="submit" size="lg" disabled={pending}>
         {pending ? "Creating…" : "Create my profile"}
-      </button>
+      </Button>
     </form>
   );
 }

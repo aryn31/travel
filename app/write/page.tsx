@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getViewer } from "@/lib/session";
+import { Button } from "@/components/ui/Button";
 import { createDraft } from "./actions";
 
 export const metadata = { title: "Write" };
@@ -9,27 +10,28 @@ export default async function NewStoryPage() {
   if (!viewer) redirect("/signin");
   if (!viewer.profile) redirect("/onboarding");
 
-  // Creating the draft on GET would mean every crawler, prefetch and back
-  // button left an empty story behind, so it takes a deliberate POST.
   return (
-    <main className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center px-6 py-16">
-      <h1 className="mb-2 text-2xl font-semibold tracking-tight">New story</h1>
-      <p className="mb-8 text-sm opacity-70">
-        Starts as a private draft. Nothing is public until you publish it.
-      </p>
-      <form
-        action={async () => {
-          "use server";
-          await createDraft();
-        }}
-      >
-        <button
-          type="submit"
-          className="w-full rounded-lg bg-foreground px-3 py-2.5 font-medium text-background hover:opacity-85"
+    <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center px-6 py-20">
+      <div className="rounded-2xl border border-rule bg-surface p-8 text-center sm:p-10">
+        <h1 className="text-2xl font-semibold tracking-tight">New story</h1>
+        <p className="mx-auto mt-2 max-w-xs text-muted">
+          It starts as a private draft. Nothing is public until you publish it.
+        </p>
+
+        {/* Creating the draft on GET would mean every crawler, prefetch and
+            back button left an empty story behind, so it takes a POST. */}
+        <form
+          action={async () => {
+            "use server";
+            await createDraft();
+          }}
+          className="mt-8"
         >
-          Start writing
-        </button>
-      </form>
+          <Button type="submit" size="lg" className="w-full">
+            Start writing
+          </Button>
+        </form>
+      </div>
     </main>
   );
 }
