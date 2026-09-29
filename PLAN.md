@@ -1,6 +1,6 @@
 # Travel Stories Platform — Build Plan
 
-**Stack:** Next.js 15 (App Router, TS) · Postgres · Drizzle · Vercel
+**Stack:** Next.js 16 (App Router, TS) · Postgres · Drizzle · Vercel
 **Approach:** lean MVP in ~5 weeks, then layer community + maps
 
 ---
@@ -140,13 +140,18 @@ outside that one file.
 
 ## 5. Milestones
 
-**Week 0 — foundation (2–3 days)**
+**Week 0 — foundation ✅ done**
 Scaffold, Tailwind + shadcn/ui, Drizzle against a Docker Postgres, Auth.js with
 a dev email provider that logs the sign-in link to the terminal, `profiles` row
 created on first sign-in, handle picker. Skip Google OAuth for now — it needs a
 callback URL and a console project, and email-link covers local testing.
 Done when: `docker compose up` plus `npm run dev` gets you signed in at
 `localhost:3000` from a cold clone.
+
+*As built:* Next.js **16**.3.7 (the plan was written against 15), Postgres 17
+on host port **5433** — 5432 was already taken by another project's container.
+Google OAuth deferred to deploy time. Verified end to end in a browser:
+request link → follow it → pick handle → land on `/@aryan`.
 
 **Week 1 — stories exist**
 Schema + migrations. `/write` creates a draft, autosaves every few seconds,
