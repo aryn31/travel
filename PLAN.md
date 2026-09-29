@@ -153,10 +153,18 @@ on host port **5433** — 5432 was already taken by another project's container.
 Google OAuth deferred to deploy time. Verified end to end in a browser:
 request link → follow it → pick handle → land on `/@aryan`.
 
-**Week 1 — stories exist**
+**Week 1 — stories exist ✅ done**
 Schema + migrations. `/write` creates a draft, autosaves every few seconds,
-`/@me/drafts` lists them, publish sets `status` + `published_at`. Plain
+`/drafts` lists them, publish sets `status` + `published_at`. Plain
 textarea is fine here. Done when: a story round-trips DB → page.
+
+*As built:* drafts list at `/drafts`, not `/@me/drafts` — static routes shadow
+the `/@handle` segment, so a flat path avoids fighting the router for no gain.
+Body is already stored as a TipTap-shaped doc in `body_json` (§4.2), so Week 2
+swaps the editor without touching existing drafts. The generated `search_vector`
+works today — Week 4's search is mostly wiring. Verified: drafts 404 for
+everyone but their author, including a different signed-in user, and never
+appear in public listings.
 
 **Week 2 — the editor and images**
 TipTap with headings, bold/italic, quote, link, list, divider, image block.

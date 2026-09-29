@@ -1,11 +1,16 @@
 import { sql } from "drizzle-orm";
 import {
   pgTable,
+  pgEnum,
   text,
   timestamp,
   integer,
+  doublePrecision,
+  jsonb,
+  index,
   primaryKey,
   uniqueIndex,
+  customType,
 } from "drizzle-orm/pg-core";
 import type { AdapterAccountType } from "next-auth/adapters";
 
@@ -91,3 +96,90 @@ export const profiles = pgTable(
 );
 
 export type Profile = typeof profiles.$inferSelect;
+
+/** Postgres full-text search vector. Drizzle has no built-in tsvector type. */
+const tsvector = customType<{ data: string }>({
+  dataType: () => "tsvector",
+});
+
+export const storyStatus = pgEnum("story_status", [
+  "draft",
+  "published",
+  "unlisted",
+]);
+
+export const media = pgTable("media", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  ownerId: text("owner_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  storageKey: text("storage_key").notNull(),
+  // Stored at upload time so the reading page can reserve space before the
+  // image loads -- no layout shift on a photo-heavy story.
+  width: integer("width").notNull(),
+  height: integer("height").notNull(),
+  mime: text("mime").notNull(),
+  bytes: integer("bytes").notNull(),
+  blurhash: text("blurhash"),
+  alt: text("alt"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const stories = pgTable(
+  "stories",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    authorId: text("author_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    slug: text("slug").notNull(),
+    title: text("title").notNull().default(""),
+    subtitle: text("subtitle"),
+
+    // body_json is the source of truth (TipTap doc from Week 2 on); body_text
+    // is the flattened copy that search and excerpts read. Storing HTML here
+    // instead would mean sanitising forever -- see PLAN.md 4.2.
+    bodyJson: jsonb("body_json").notNull().default({ type: "doc", content: [] }),
+    bodyText: text("body_text").notNull().default(""),
+
+    coverMediaId: text("cover_media_id").references(() => media.id, {
+      onDelete: "set null",
+    }),
+
+    status: storyStatus("status").notNull().default("draft"),
+    publishedAt: timestamp("published_at"),
+
+    readingMinutes: integer("reading_minutes").notNull().default(0),
+    likeCount: integer("like_count").notNull().default(0),
+    commentCount: integer("comment_count").notNull().default(0),
+
+    // Flat place fields for now; the places table in phase 2 backfills from
+    // these rather than replacing them -- see PLAN.md 4.4.
+    placeName: text("place_name"),
+    countryCode: text("country_code"),
+    lat: doublePrecision("lat"),
+    lng: doublePrecision("lng"),
+
+    searchVector: tsvector("search_vector").generatedAlwaysAs(
+      sql`setweight(to_tsvector('english', coalesce(title, '')), 'A') || setweight(to_tsvector('english', coalesce(body_text, '')), 'B')`,
+    ),
+
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    // Slugs are unique per author, not globally: the URL is /@handle/slug,
+    // so two people can both write "three-days-in-lisbon".
+    uniqueIndex("stories_author_slug_idx").on(t.authorId, t.slug),
+    index("stories_published_idx").on(t.status, t.publishedAt.desc()),
+    index("stories_author_updated_idx").on(t.authorId, t.updatedAt.desc()),
+    index("stories_search_idx").using("gin", t.searchVector),
+  ],
+);
+
+export type Story = typeof stories.$inferSelect;
+export type Media = typeof media.$inferSelect;

@@ -15,12 +15,20 @@ export async function SiteHeader() {
           {viewer ? (
             <>
               {viewer.profile ? (
-                <Link
-                  href={`/@${viewer.profile.handle}`}
-                  className="text-sm opacity-60 hover:opacity-100"
-                >
-                  @{viewer.profile.handle}
-                </Link>
+                <>
+                  <Link href="/write" className="text-sm opacity-60 hover:opacity-100">
+                    Write
+                  </Link>
+                  <Link href="/drafts" className="text-sm opacity-60 hover:opacity-100">
+                    Stories
+                  </Link>
+                  <Link
+                    href={`/@${viewer.profile.handle}`}
+                    className="text-sm opacity-60 hover:opacity-100"
+                  >
+                    @{viewer.profile.handle}
+                  </Link>
+                </>
               ) : (
                 <Link href="/onboarding" className="text-sm opacity-60 hover:opacity-100">
                   Finish setup
