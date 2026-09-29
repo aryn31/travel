@@ -1,15 +1,38 @@
 /**
- * Minimal TipTap-compatible document shape. Week 1 writes these from a plain
- * textarea; Week 2 swaps in the real editor and the stored format is already
- * right, so no migration and no reformatting of existing drafts.
+ * TipTap document helpers. body_json is the source of truth; body_text is the
+ * flattened copy that search and excerpts read (PLAN.md 4.2).
  */
-export type TextNode = { type: "text"; text: string };
-export type Paragraph = { type: "paragraph"; content?: TextNode[] };
-export type StoryDoc = { type: "doc"; content: Paragraph[] };
+export type Mark = { type: string; attrs?: Record<string, unknown> };
+export type Node = {
+  type: string;
+  text?: string;
+  attrs?: Record<string, unknown>;
+  marks?: Mark[];
+  content?: Node[];
+};
+export type StoryDoc = { type: "doc"; content: Node[] };
 
 export const EMPTY_DOC: StoryDoc = { type: "doc", content: [] };
 
-/** One line of the textarea becomes one paragraph. textToDoc/docToText round-trip exactly. */
+/** Blocks whose text should end up on its own line in body_text. */
+const BLOCK_TYPES = new Set([
+  "paragraph",
+  "heading",
+  "blockquote",
+  "listItem",
+  "codeBlock",
+]);
+
+export function isDoc(value: unknown): value is StoryDoc {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    (value as StoryDoc).type === "doc" &&
+    Array.isArray((value as StoryDoc).content)
+  );
+}
+
+/** Plain text for one line of the textarea era; still used for empty drafts. */
 export function textToDoc(text: string): StoryDoc {
   if (text.length === 0) return EMPTY_DOC;
   return {
@@ -22,14 +45,43 @@ export function textToDoc(text: string): StoryDoc {
   };
 }
 
+/**
+ * Flatten any TipTap doc to text. Walks the whole tree rather than assuming
+ * one level of paragraphs, so headings, lists and quotes are all searchable.
+ */
 export function docToText(doc: unknown): string {
-  if (!doc || typeof doc !== "object") return "";
-  const content = (doc as StoryDoc).content;
-  if (!Array.isArray(content)) return "";
+  if (!isDoc(doc)) return "";
 
-  return content
-    .map((block) => (block.content ?? []).map((n) => n.text ?? "").join(""))
-    .join("\n");
+  const lines: string[] = [];
+
+  const walk = (node: Node, into: string[]) => {
+    if (node.type === "text") {
+      into.push(node.text ?? "");
+      return;
+    }
+    if (node.type === "hardBreak") {
+      into.push("\n");
+      return;
+    }
+    if (node.type === "image") {
+      const alt = typeof node.attrs?.alt === "string" ? node.attrs.alt : "";
+      if (alt) lines.push(alt);
+      return;
+    }
+
+    if (BLOCK_TYPES.has(node.type)) {
+      const parts: string[] = [];
+      for (const child of node.content ?? []) walk(child, parts);
+      const line = parts.join("").trim();
+      if (line) lines.push(line);
+      return;
+    }
+
+    for (const child of node.content ?? []) walk(child, into);
+  };
+
+  for (const node of doc.content) walk(node, []);
+  return lines.join("\n");
 }
 
 export function readingMinutes(text: string): number {
@@ -42,4 +94,18 @@ export function excerpt(text: string, max = 180): string {
   const flat = text.replace(/\s+/g, " ").trim();
   if (flat.length <= max) return flat;
   return `${flat.slice(0, max).replace(/\s+\S*$/, "")}…`;
+}
+
+/** Image keys referenced by a doc, so orphaned uploads can be spotted later. */
+export function imageUrls(doc: unknown): string[] {
+  if (!isDoc(doc)) return [];
+  const found: string[] = [];
+  const walk = (node: Node) => {
+    if (node.type === "image" && typeof node.attrs?.src === "string") {
+      found.push(node.attrs.src);
+    }
+    for (const child of node.content ?? []) walk(child);
+  };
+  for (const node of doc.content) walk(node);
+  return found;
 }

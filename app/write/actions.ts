@@ -4,11 +4,11 @@ import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
-import { profiles, stories } from "@/lib/db/schema";
+import { media, profiles, stories } from "@/lib/db/schema";
 import type { Story } from "@/lib/db/schema";
 import { getViewer } from "@/lib/session";
 import { slugForTitle } from "@/lib/stories";
-import { docToText, readingMinutes, textToDoc } from "@/lib/story-doc";
+import { docToText, isDoc, readingMinutes } from "@/lib/story-doc";
 
 /**
  * Every mutation goes through this. Ownership is checked against the session
@@ -51,12 +51,16 @@ export type SaveResult = { ok: true; savedAt: number } | { ok: false; error: str
 export async function saveStory(
   storyId: string,
   title: string,
-  body: string,
+  doc: unknown,
 ): Promise<SaveResult> {
   const story = await requireOwnStory(storyId);
 
+  // The document arrives from the browser, so it gets shape-checked before it
+  // becomes the stored source of truth.
+  if (!isDoc(doc)) return { ok: false, error: "Could not save — bad document." };
+
   const cleanTitle = title.slice(0, 200);
-  const text = body;
+  const text = docToText(doc);
 
   // A published story keeps its slug. Re-slugging on a title tweak would
   // silently break every link already pointing at it (PLAN.md 4.1).
@@ -70,7 +74,7 @@ export async function saveStory(
     .set({
       title: cleanTitle,
       slug,
-      bodyJson: textToDoc(text),
+      bodyJson: doc,
       bodyText: text,
       readingMinutes: readingMinutes(text),
       updatedAt: new Date(),
@@ -153,4 +157,27 @@ async function revalidateStory(authorId: string, slug: string) {
   if (!handle) return;
   revalidatePath(`/@${handle}`);
   revalidatePath(`/@${handle}/${slug}`);
+}
+
+/** Cover image. Passing null clears it. */
+export async function setCover(storyId: string, mediaId: string | null) {
+  const story = await requireOwnStory(storyId);
+
+  if (mediaId !== null) {
+    // Confirm the image belongs to this author -- otherwise any media id
+    // could be pinned to any story.
+    const [owned] = await db
+      .select({ id: media.id })
+      .from(media)
+      .where(and(eq(media.id, mediaId), eq(media.ownerId, story.authorId)))
+      .limit(1);
+    if (!owned) return;
+  }
+
+  await db
+    .update(stories)
+    .set({ coverMediaId: mediaId, updatedAt: new Date() })
+    .where(eq(stories.id, story.id));
+
+  if (story.status !== "draft") await revalidateStory(story.authorId, story.slug);
 }

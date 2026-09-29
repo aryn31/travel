@@ -2,18 +2,21 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { profiles, stories } from "@/lib/db/schema";
+import { media, profiles, stories } from "@/lib/db/schema";
 import { getViewer } from "@/lib/session";
-import { docToText, excerpt } from "@/lib/story-doc";
+import { excerpt } from "@/lib/story-doc";
+import { publicUrl } from "@/lib/storage";
+import { StoryBody } from "@/components/StoryBody";
 
 async function load(handleSegment: string, slug: string) {
   const raw = decodeURIComponent(handleSegment);
   if (!raw.startsWith("@")) return null;
 
   const [row] = await db
-    .select({ story: stories, profile: profiles })
+    .select({ story: stories, profile: profiles, cover: media })
     .from(stories)
     .innerJoin(profiles, eq(profiles.userId, stories.authorId))
+    .leftJoin(media, eq(media.id, stories.coverMediaId))
     .where(
       and(
         sql`lower(${profiles.handle}) = ${raw.slice(1).toLowerCase()}`,
@@ -36,6 +39,9 @@ export async function generateMetadata({
   return {
     title: row.story.title || "Untitled",
     description: excerpt(row.story.bodyText, 160),
+    openGraph: row.cover
+      ? { images: [{ url: publicUrl(row.cover.storageKey) }] }
+      : undefined,
     // A draft is reachable by its author, so it must never be indexable.
     robots: isPublic ? undefined : { index: false, follow: false },
   };
@@ -48,15 +54,13 @@ export default async function StoryPage({
   const row = await load(handle, slug);
   if (!row) notFound();
 
-  const { story, profile } = row;
+  const { story, profile, cover } = row;
   const viewer = await getViewer();
   const isAuthor = viewer?.userId === story.authorId;
 
   // Same 404 as a missing story: a draft's existence shouldn't be probeable
   // by anyone but its author.
   if (story.status === "draft" && !isAuthor) notFound();
-
-  const paragraphs = docToText(story.bodyJson).split("\n");
 
   return (
     <main className="mx-auto w-full max-w-2xl flex-1 px-6 py-12">
@@ -100,10 +104,21 @@ export default async function StoryPage({
           )}
         </div>
 
-        <div className="mt-10 space-y-5 text-lg leading-relaxed">
-          {paragraphs.map((p, i) =>
-            p.length > 0 ? <p key={i}>{p}</p> : <div key={i} aria-hidden className="h-2" />,
-          )}
+        {cover && (
+          <figure className="mt-10 -mx-6 sm:mx-0">
+            {/* eslint-disable-next-line @next/next/no-img-element -- see StoryBody */}
+            <img
+              src={publicUrl(cover.storageKey)}
+              alt=""
+              width={cover.width}
+              height={cover.height}
+              className="h-auto w-full sm:rounded-lg"
+            />
+          </figure>
+        )}
+
+        <div className="mt-6">
+          <StoryBody doc={story.bodyJson} />
         </div>
       </article>
 

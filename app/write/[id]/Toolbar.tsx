@@ -1,0 +1,143 @@
+"use client";
+
+import type { Editor } from "@tiptap/react";
+
+function Button({
+  onClick,
+  active,
+  disabled,
+  label,
+  children,
+}: {
+  onClick: () => void;
+  active?: boolean;
+  disabled?: boolean;
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      aria-pressed={active}
+      title={label}
+      className={`rounded px-2 py-1 text-sm transition-colors disabled:opacity-30 ${
+        active
+          ? "bg-foreground text-background"
+          : "hover:bg-black/5 dark:hover:bg-white/10"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+export function Toolbar({
+  editor,
+  onPickImage,
+  uploading,
+}: {
+  editor: Editor;
+  onPickImage: () => void;
+  uploading: boolean;
+}) {
+  function setLink() {
+    const previous = editor.getAttributes("link").href as string | undefined;
+    const input = window.prompt("Link URL (https://…)", previous ?? "https://");
+
+    // Cancelled: leave the document alone.
+    if (input === null) return;
+    if (input.trim() === "") {
+      editor.chain().focus().unsetLink().run();
+      return;
+    }
+    if (!/^https?:\/\//i.test(input.trim())) {
+      // The renderer drops non-http hrefs anyway; refusing here means the
+      // author finds out now rather than wondering why the link vanished.
+      window.alert("Links must start with http:// or https://");
+      return;
+    }
+    editor.chain().focus().extendMarkRange("link").setLink({ href: input.trim() }).run();
+  }
+
+  return (
+    <div className="sticky top-0 z-10 -mx-6 mb-6 flex flex-wrap items-center gap-0.5 border-b border-black/10 bg-background/90 px-6 py-2 backdrop-blur dark:border-white/15">
+      <Button
+        label="Heading"
+        active={editor.isActive("heading", { level: 2 })}
+        onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+      >
+        H2
+      </Button>
+      <Button
+        label="Subheading"
+        active={editor.isActive("heading", { level: 3 })}
+        onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
+      >
+        H3
+      </Button>
+
+      <Divider />
+
+      <Button
+        label="Bold"
+        active={editor.isActive("bold")}
+        onClick={() => editor.chain().focus().toggleBold().run()}
+      >
+        <strong>B</strong>
+      </Button>
+      <Button
+        label="Italic"
+        active={editor.isActive("italic")}
+        onClick={() => editor.chain().focus().toggleItalic().run()}
+      >
+        <em>I</em>
+      </Button>
+      <Button label="Link" active={editor.isActive("link")} onClick={setLink}>
+        Link
+      </Button>
+
+      <Divider />
+
+      <Button
+        label="Quote"
+        active={editor.isActive("blockquote")}
+        onClick={() => editor.chain().focus().toggleBlockquote().run()}
+      >
+        &ldquo;&rdquo;
+      </Button>
+      <Button
+        label="Bullet list"
+        active={editor.isActive("bulletList")}
+        onClick={() => editor.chain().focus().toggleBulletList().run()}
+      >
+        • List
+      </Button>
+      <Button
+        label="Numbered list"
+        active={editor.isActive("orderedList")}
+        onClick={() => editor.chain().focus().toggleOrderedList().run()}
+      >
+        1. List
+      </Button>
+      <Button
+        label="Divider"
+        onClick={() => editor.chain().focus().setHorizontalRule().run()}
+      >
+        —
+      </Button>
+
+      <Divider />
+
+      <Button label="Insert image" onClick={onPickImage} disabled={uploading}>
+        {uploading ? "Uploading…" : "Image"}
+      </Button>
+    </div>
+  );
+}
+
+function Divider() {
+  return <span aria-hidden className="mx-1.5 h-5 w-px bg-black/10 dark:bg-white/15" />;
+}

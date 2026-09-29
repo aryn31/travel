@@ -24,3 +24,60 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
 }
+
+/* ------------------------------------------------------------------ *
+ * Editor surface. TipTap ships no styling, so the writing view has to
+ * be told what a heading or a quote looks like -- these mirror the
+ * reading-page classes in components/StoryBody.tsx so what you type is
+ * what you get.
+ * ------------------------------------------------------------------ */
+
+.ProseMirror { outline: none; }
+
+.ProseMirror p { margin: 1.25rem 0; line-height: 1.7; }
+.ProseMirror h2 { margin: 3rem 0 1rem; font-size: 1.5rem; font-weight: 600; letter-spacing: -0.015em; }
+.ProseMirror h3 { margin: 2.5rem 0 0.75rem; font-size: 1.25rem; font-weight: 600; letter-spacing: -0.015em; }
+.ProseMirror ul { margin: 1.25rem 0; padding-left: 1.5rem; list-style: disc; }
+.ProseMirror ol { margin: 1.25rem 0; padding-left: 1.5rem; list-style: decimal; }
+.ProseMirror li > p { margin: 0; }
+.ProseMirror blockquote {
+  margin: 1.5rem 0;
+  padding-left: 1.25rem;
+  border-left: 2px solid color-mix(in srgb, currentColor 20%, transparent);
+  font-style: italic;
+  opacity: 0.8;
+}
+.ProseMirror hr {
+  margin: 2.5rem 0;
+  border: 0;
+  border-top: 1px solid color-mix(in srgb, currentColor 15%, transparent);
+}
+.ProseMirror a { text-decoration: underline; text-underline-offset: 2px; }
+.ProseMirror code {
+  border-radius: 0.25rem;
+  padding: 0.125rem 0.375rem;
+  font-size: 0.9em;
+  background: color-mix(in srgb, currentColor 8%, transparent);
+}
+.ProseMirror img {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin: 2rem 0;
+  border-radius: 0.5rem;
+}
+/* Selected image gets a visible ring, otherwise there's no way to tell
+   which one a delete or alt-text edit will apply to. */
+.ProseMirror img.ProseMirror-selectednode {
+  outline: 2px solid currentColor;
+  outline-offset: 3px;
+}
+
+/* Placeholder: TipTap only adds the class and the data attribute. */
+.ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+  opacity: 0.3;
+}

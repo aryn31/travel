@@ -166,12 +166,22 @@ works today — Week 4's search is mostly wiring. Verified: drafts 404 for
 everyone but their author, including a different signed-in user, and never
 appear in public listings.
 
-**Week 2 — the editor and images**
+**Week 2 — the editor and images ✅ done**
 TipTap with headings, bold/italic, quote, link, list, divider, image block.
 Presigned R2 uploads with progress and drag-drop. Cover image picker.
 JSON → React renderer shared by editor preview and reading page.
 Done when: you publish a real story of your own with eight photos and it looks
 good on a phone.
+
+*As built:* uploads go through `lib/storage.ts` with a disk driver behind a
+**signed** PUT URL — the signature is what makes the endpoint safe, and it's the
+property R2 gives for free (§4.5). Images are resized to 2560px and re-encoded
+to WebP **in the browser** before upload: a 3000×2000 PNG went 360 KB → 37 KB,
+which is §8's main cost lever working. `components/StoryBody.tsx` renders the
+document as a strict allow-list — unknown nodes, `javascript:`/`data:` hrefs and
+non-local image sources are dropped, and surviving links get
+`rel="noopener noreferrer nofollow ugc"`. Blurhash deferred; intrinsic
+width/height already prevent layout shift, which was the point of it.
 
 **Week 3 — reading and identity**
 Reading page typography, author byline card, reading time, share + OG image via

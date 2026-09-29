@@ -1,9 +1,9 @@
 import { and, eq } from "drizzle-orm";
 import { notFound, redirect } from "next/navigation";
 import { db } from "@/lib/db";
-import { stories } from "@/lib/db/schema";
+import { media, stories } from "@/lib/db/schema";
 import { getViewer } from "@/lib/session";
-import { docToText } from "@/lib/story-doc";
+import { publicUrl } from "@/lib/storage";
 import { Editor } from "./Editor";
 
 export const metadata = { title: "Write" };
@@ -14,24 +14,29 @@ export default async function WritePage({ params }: PageProps<"/write/[id]">) {
   if (!viewer) redirect("/signin");
   if (!viewer.profile) redirect("/onboarding");
 
-  const [story] = await db
-    .select()
+  const [row] = await db
+    .select({ story: stories, cover: media })
     .from(stories)
+    .leftJoin(media, eq(media.id, stories.coverMediaId))
     .where(and(eq(stories.id, id), eq(stories.authorId, viewer.userId)))
     .limit(1);
 
-  if (!story) notFound();
+  if (!row) notFound();
+  const { story, cover } = row;
 
   return (
     <Editor
       storyId={story.id}
       initialTitle={story.title}
-      initialBody={docToText(story.bodyJson)}
+      initialDoc={story.bodyJson}
       status={story.status}
       publicUrl={
         story.status === "published"
           ? `/@${viewer.profile.handle}/${story.slug}`
           : null
+      }
+      initialCover={
+        cover ? { id: cover.id, url: publicUrl(cover.storageKey) } : null
       }
     />
   );
