@@ -24,7 +24,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">
+      {/* pt-16 clears the fixed header on every page; the home hero cancels
+          it with -mt-16 so the landscape runs behind the header. */}
+      <body className="min-h-full flex flex-col pt-16">
         <SiteHeader />
         {children}
       </body>

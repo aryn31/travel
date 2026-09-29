@@ -3,11 +3,36 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --muted: #5c5c5c;
+  --rule: rgba(0, 0, 0, 0.1);
+
+  /* Hero palette -- clear morning. Each range back is lighter and lower
+     contrast, which is what makes the depth read. */
+  --hero-sky-top: #8fb5db;
+  --hero-sky-mid: #cadbe9;
+  --hero-sky-low: #f6e7d4;
+  --hero-sun: #ffcb8a;
+  --hero-sun-disc: 0.95;
+  --hero-haze: #ffffff;
+  --hero-haze-far: 0.55;
+  --hero-haze-mid: 0.42;
+  --hero-haze-near: 0.28;
+  --hero-far: #c5d2e0;
+  --hero-mid: #adbed1;
+  --hero-near: #93a7c0;
+  --hero-front: #788faa;
+  --hero-rim: #ffffff;
+  --hero-rim-far: 0.5;
+  --hero-rim-mid: 0.35;
+  --hero-rim-near: 0.22;
+  --hero-grain: 0.04;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-rule: var(--rule);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -16,6 +41,29 @@
   :root {
     --background: #0a0a0a;
     --foreground: #ededed;
+    --muted: #a1a1a1;
+    --rule: rgba(255, 255, 255, 0.14);
+
+    /* Dusk. The warm band at the horizon is what stops a dark hero from
+       reading as a black rectangle. */
+    --hero-sky-top: #060b1a;
+    --hero-sky-mid: #16243f;
+    --hero-sky-low: #5d4a55;
+    --hero-sun: #ffb877;
+    --hero-sun-disc: 0.75;
+    --hero-haze: #6b7a99;
+    --hero-haze-far: 0.4;
+    --hero-haze-mid: 0.3;
+    --hero-haze-near: 0.2;
+    --hero-far: #46536f;
+    --hero-mid: #333e59;
+    --hero-near: #212a41;
+    --hero-front: #10151f;
+    --hero-rim: #ffd2a8;
+    --hero-rim-far: 0.45;
+    --hero-rim-mid: 0.3;
+    --hero-rim-near: 0.18;
+    --hero-grain: 0.06;
   }
 }
 

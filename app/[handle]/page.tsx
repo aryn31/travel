@@ -2,8 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { profiles, stories } from "@/lib/db/schema";
+import { media, profiles, stories } from "@/lib/db/schema";
 import { getViewer } from "@/lib/session";
+import { publicUrl } from "@/lib/storage";
 import { StoryList } from "@/components/StoryList";
 
 async function loadProfile(segment: string) {
@@ -43,7 +44,7 @@ export default async function ProfilePage({ params }: PageProps<"/[handle]">) {
   const viewer = await getViewer();
   const isMe = viewer?.userId === profile.userId;
 
-  const published = await db
+  const rows = await db
     .select({
       id: stories.id,
       slug: stories.slug,
@@ -53,9 +54,13 @@ export default async function ProfilePage({ params }: PageProps<"/[handle]">) {
       publishedAt: stories.publishedAt,
       handle: profiles.handle,
       displayName: profiles.displayName,
+      coverKey: media.storageKey,
+      coverWidth: media.width,
+      coverHeight: media.height,
     })
     .from(stories)
     .innerJoin(profiles, eq(profiles.userId, stories.authorId))
+    .leftJoin(media, eq(media.id, stories.coverMediaId))
     .where(
       and(
         eq(stories.authorId, profile.userId),
@@ -63,6 +68,13 @@ export default async function ProfilePage({ params }: PageProps<"/[handle]">) {
       ),
     )
     .orderBy(desc(stories.publishedAt));
+
+  const published = rows.map((r) => ({
+    ...r,
+    cover: r.coverKey
+      ? { url: publicUrl(r.coverKey), width: r.coverWidth!, height: r.coverHeight! }
+      : null,
+  }));
 
   return (
     <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-12">

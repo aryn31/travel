@@ -8,7 +8,7 @@ export function SignOutButton() {
         await signOut({ redirectTo: "/" });
       }}
     >
-      <button type="submit" className="text-sm opacity-60 hover:opacity-100">
+      <button type="submit" className="text-sm text-muted transition-colors hover:text-foreground">
         Sign out
       </button>
     </form>
