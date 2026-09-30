@@ -66,7 +66,7 @@ function renderNode(node: Node, key: string): ReactNode {
 
     case "paragraph":
       return (
-        <p key={key} className="my-5 leading-relaxed">
+        <p key={key} className="my-6 leading-[1.75]">
           {renderNodes(node.content, key)}
         </p>
       );
@@ -79,8 +79,8 @@ function renderNode(node: Node, key: string): ReactNode {
           key={key}
           className={
             level === 3
-              ? "mt-10 mb-3 text-xl font-semibold tracking-tight"
-              : "mt-12 mb-4 text-2xl font-semibold tracking-tight"
+              ? "font-display mt-11 mb-3 text-xl font-semibold tracking-tight"
+              : "font-display mt-14 mb-4 text-3xl font-semibold tracking-tight"
           }
         >
           {renderNodes(node.content, key)}
@@ -92,7 +92,7 @@ function renderNode(node: Node, key: string): ReactNode {
       return (
         <blockquote
           key={key}
-          className="my-6 border-l-2 border-black/20 pl-5 italic opacity-80 dark:border-white/30"
+          className="font-display my-8 border-l-2 border-accent/50 pl-6 text-xl italic leading-relaxed text-foreground/85"
         >
           {renderNodes(node.content, key)}
         </blockquote>
@@ -131,7 +131,7 @@ function renderNode(node: Node, key: string): ReactNode {
 
     case "horizontalRule":
       return (
-        <hr key={key} className="my-10 border-black/10 dark:border-white/15" />
+        <hr key={key} className="mx-auto my-12 w-16 border-t-2 border-accent/30" />
       );
 
     case "image": {
@@ -159,10 +159,10 @@ function renderNode(node: Node, key: string): ReactNode {
             height={height}
             loading="lazy"
             decoding="async"
-            className="h-auto w-full sm:rounded-lg"
+            className="h-auto w-full sm:rounded-xl sm:shadow-[var(--shadow)]"
           />
           {alt && (
-            <figcaption className="mt-2 px-6 text-sm opacity-50 sm:px-0">
+            <figcaption className="mt-3 px-6 text-sm italic text-muted sm:px-0">
               {alt}
             </figcaption>
           )}
@@ -177,5 +177,12 @@ function renderNode(node: Node, key: string): ReactNode {
 
 export function StoryBody({ doc }: { doc: unknown }) {
   if (!isDoc(doc)) return null;
-  return <div className="text-lg">{renderNodes(doc.content, "n")}</div>;
+  // Story prose sits in the display serif at reading optical size -- the
+  // same family as the headline, which is what makes a page read as one
+  // piece rather than as a template with content poured in.
+  return (
+    <div className="font-display text-[1.19rem]">
+      {renderNodes(doc.content, "n")}
+    </div>
+  );
 }

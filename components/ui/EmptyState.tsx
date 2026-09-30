@@ -7,7 +7,7 @@ export function EmptyState({
 }) {
   return (
     <div className="rounded-2xl border border-dashed border-rule px-8 py-14 text-center">
-      <p className="text-lg">{title}</p>
+      <p className="font-display text-xl font-semibold">{title}</p>
       {children && <div className="mt-2 text-muted">{children}</div>}
     </div>
   );

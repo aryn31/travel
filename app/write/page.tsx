@@ -12,8 +12,8 @@ export default async function NewStoryPage() {
 
   return (
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center px-6 py-20">
-      <div className="rounded-2xl border border-rule bg-surface p-8 text-center sm:p-10">
-        <h1 className="text-2xl font-semibold tracking-tight">New story</h1>
+      <div className="rounded-2xl border border-rule bg-surface p-8 text-center shadow-[var(--shadow)] sm:p-10">
+        <h1 className="font-display text-3xl font-semibold tracking-tight">New story</h1>
         <p className="mx-auto mt-2 max-w-xs text-muted">
           It starts as a private draft. Nothing is public until you publish it.
         </p>

@@ -11,7 +11,7 @@ export async function SiteHeader() {
   return (
     <HeaderShell>
       <div className="mx-auto flex w-full max-w-3xl items-center justify-between px-6 py-4">
-        <Link href="/" className="font-semibold tracking-tight">
+        <Link href="/" className="font-display text-lg font-semibold tracking-tight">
           Travel Stories
         </Link>
         <nav className="flex items-center gap-1 text-sm">

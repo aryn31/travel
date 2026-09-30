@@ -302,7 +302,7 @@ export function Editor({
         }}
         onBlur={() => save.kind === "dirty" && void flush()}
         placeholder="Title"
-        className="mb-2 w-full bg-transparent text-3xl font-semibold tracking-tight outline-none placeholder:opacity-30"
+        className="font-display mb-2 w-full bg-transparent text-4xl font-semibold tracking-tight outline-none placeholder:text-faint"
       />
 
       {editor && (

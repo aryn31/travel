@@ -31,7 +31,7 @@ export default async function DraftsPage() {
     <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-12 pb-24">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Your stories</h1>
+          <h1 className="font-display text-4xl font-semibold tracking-tight">Your stories</h1>
           <p className="mt-1.5 text-sm text-muted">
             {published.length} published · {drafts.length}{" "}
             {drafts.length === 1 ? "draft" : "drafts"}
@@ -97,7 +97,7 @@ function Section({
 }) {
   return (
     <section>
-      <h2 className="mb-1 flex items-baseline gap-2 text-xs font-medium uppercase tracking-[0.2em] text-muted">
+      <h2 className="eyebrow mb-1 flex items-baseline gap-2">
         {title}
         <span className="text-faint">{count}</span>
       </h2>

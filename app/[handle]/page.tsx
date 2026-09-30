@@ -54,6 +54,8 @@ export default async function ProfilePage({ params }: PageProps<"/[handle]">) {
       title: stories.title,
       excerpt: stories.excerpt,
       bodyText: stories.bodyText,
+      placeName: stories.placeName,
+      countryCode: stories.countryCode,
       readingMinutes: stories.readingMinutes,
       publishedAt: stories.publishedAt,
       handle: profiles.handle,
@@ -88,7 +90,7 @@ export default async function ProfilePage({ params }: PageProps<"/[handle]">) {
             <div className="flex items-center gap-5">
               <Avatar name={profile.displayName} handle={profile.handle} size="lg" />
               <div className="min-w-0">
-                <h1 className="text-3xl font-semibold tracking-tight">
+                <h1 className="font-display text-4xl font-semibold tracking-tight">
                   {profile.displayName}
                 </h1>
                 <p className="mt-1 text-muted">@{profile.handle}</p>

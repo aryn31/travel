@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Fraunces, Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
@@ -14,6 +14,18 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+/**
+ * Display and story prose. Fraunces is a variable serif with optical sizing,
+ * so the same family covers a 56px headline and 19px body text without
+ * looking like two different fonts -- and its warmth is what stops the page
+ * reading like a dashboard.
+ */
+const fraunces = Fraunces({
+  variable: "--font-display",
+  subsets: ["latin"],
+  axes: ["SOFT", "WONK", "opsz"],
+});
+
 export const metadata: Metadata = {
   // Without this, Open Graph image URLs stay relative and every social
   // scraper drops them -- shared links render with no image at all.
@@ -26,7 +38,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${fraunces.variable} h-full antialiased`}
     >
       {/* pt-16 clears the fixed header on every page; the home hero cancels
           it with -mt-16 so the landscape runs behind the header. */}

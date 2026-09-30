@@ -1,17 +1,22 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-  --muted: #5c5c5c;
-  --faint: #8a8a8a;
-  --rule: rgba(0, 0, 0, 0.09);
-  --surface: #f7f7f6;
-  --surface-hover: #f0f0ee;
-  /* One accent, used sparingly -- it picks up the warmth of the hero sun
-     rather than introducing a second unrelated hue. */
-  --accent: #a8542c;
-  --accent-soft: rgba(168, 84, 44, 0.1);
+  /* Warm paper rather than white. A neutral grey page makes travel writing
+     look like a spreadsheet; the whole palette is pulled toward sand, clay
+     and sea so the photographs sit in something. */
+  --background: #fbf7f1;
+  --foreground: #1c1714;
+  --muted: #6b5f55;
+  --faint: #9c8e82;
+  --rule: rgba(28, 23, 20, 0.1);
+  --surface: #f4ece0;
+  --surface-hover: #ede3d4;
+  --accent: #b4511f;      /* terracotta */
+  --accent-soft: rgba(180, 81, 31, 0.1);
+  --sea: #2f6f6b;         /* used for place + country marks */
+  --sun: #c07c10;
+  --shadow: 0 1px 2px rgba(60, 40, 25, 0.05), 0 8px 24px -12px rgba(60, 40, 25, 0.18);
+  --texture: 0.035;
 
   /* Hero palette -- clear morning. Each range back is lighter and lower
      contrast, which is what makes the depth read. */
@@ -45,21 +50,29 @@
   --color-surface-hover: var(--surface-hover);
   --color-accent: var(--accent);
   --color-accent-soft: var(--accent-soft);
+  --color-sea: var(--sea);
+  --color-sun: var(--sun);
+  --font-display: var(--font-display);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-    --muted: #a1a1a1;
-    --faint: #6f6f6f;
-    --rule: rgba(255, 255, 255, 0.12);
-    --surface: #131313;
-    --surface-hover: #1a1a1a;
-    --accent: #e39b6c;
-    --accent-soft: rgba(227, 155, 108, 0.14);
+    /* Evening, not void. Brown-black keeps the warmth after dark. */
+    --background: #14100d;
+    --foreground: #f2ebe3;
+    --muted: #a89787;
+    --faint: #6f6155;
+    --rule: rgba(242, 235, 227, 0.12);
+    --surface: #1e1813;
+    --surface-hover: #271f18;
+    --accent: #e2864f;
+    --accent-soft: rgba(226, 134, 79, 0.15);
+    --sea: #7ab9ad;
+    --sun: #ddb05c;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 30px -14px rgba(0, 0, 0, 0.7);
+    --texture: 0.05;
 
     /* Dusk. The warm band at the horizon is what stops a dark hero from
        reading as a black rectangle. */
@@ -89,6 +102,35 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
+}
+
+/* Paper grain. Barely visible on its own, but it stops large flat areas of
+   background from looking like screen and starts them looking like stock. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  /* Negative z-index paints above body's background but beneath its content,
+     so no stacking rule is needed on the children. An earlier version set
+     `body > * { position: relative }`, which forced the display:contents
+     wrapper to generate a box and trapped the hero's negative margin. */
+  z-index: -1;
+  pointer-events: none;
+  opacity: var(--texture);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+.font-display {
+  font-family: var(--font-display), ui-serif, Georgia, serif;
+}
+
+/* Small caps-ish label used for section headers and eyebrows. */
+.eyebrow {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
 }
 
 html {
@@ -124,25 +166,30 @@ html {
  * what you get.
  * ------------------------------------------------------------------ */
 
-.ProseMirror { outline: none; }
+.ProseMirror {
+  outline: none;
+  font-family: var(--font-display), ui-serif, Georgia, serif;
+  font-size: 1.19rem;
+}
 
-.ProseMirror p { margin: 1.25rem 0; line-height: 1.7; }
-.ProseMirror h2 { margin: 3rem 0 1rem; font-size: 1.5rem; font-weight: 600; letter-spacing: -0.015em; }
-.ProseMirror h3 { margin: 2.5rem 0 0.75rem; font-size: 1.25rem; font-weight: 600; letter-spacing: -0.015em; }
+.ProseMirror p { margin: 1.5rem 0; line-height: 1.75; }
+.ProseMirror h2 { margin: 3.5rem 0 1rem; font-size: 1.875rem; font-weight: 600; letter-spacing: -0.015em; }
+.ProseMirror h3 { margin: 2.75rem 0 0.75rem; font-size: 1.25rem; font-weight: 600; letter-spacing: -0.015em; }
 .ProseMirror ul { margin: 1.25rem 0; padding-left: 1.5rem; list-style: disc; }
 .ProseMirror ol { margin: 1.25rem 0; padding-left: 1.5rem; list-style: decimal; }
 .ProseMirror li > p { margin: 0; }
 .ProseMirror blockquote {
-  margin: 1.5rem 0;
-  padding-left: 1.25rem;
-  border-left: 2px solid color-mix(in srgb, currentColor 20%, transparent);
+  margin: 2rem 0;
+  padding-left: 1.5rem;
+  border-left: 2px solid color-mix(in srgb, var(--accent) 50%, transparent);
+  font-size: 1.25rem;
   font-style: italic;
-  opacity: 0.8;
 }
 .ProseMirror hr {
-  margin: 2.5rem 0;
+  width: 4rem;
+  margin: 3rem auto;
   border: 0;
-  border-top: 1px solid color-mix(in srgb, currentColor 15%, transparent);
+  border-top: 2px solid color-mix(in srgb, var(--accent) 30%, transparent);
 }
 .ProseMirror a { text-decoration: underline; text-underline-offset: 2px; }
 .ProseMirror code {
@@ -155,8 +202,9 @@ html {
   display: block;
   width: 100%;
   height: auto;
-  margin: 2rem 0;
-  border-radius: 0.5rem;
+  margin: 2.5rem 0;
+  border-radius: 0.75rem;
+  box-shadow: var(--shadow);
 }
 /* Selected image gets a visible ring, otherwise there's no way to tell
    which one a delete or alt-text edit will apply to. */

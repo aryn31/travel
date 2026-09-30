@@ -10,8 +10,8 @@ export default async function SignInPage() {
 
   return (
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center px-6 py-20">
-      <div className="rounded-2xl border border-rule bg-surface p-8 sm:p-10">
-        <h1 className="text-2xl font-semibold tracking-tight">Sign in</h1>
+      <div className="rounded-2xl border border-rule bg-surface p-8 shadow-[var(--shadow)] sm:p-10">
+        <h1 className="font-display text-3xl font-semibold tracking-tight">Sign in</h1>
         <p className="mb-8 mt-2 text-muted">
           To write and publish travel stories.
         </p>

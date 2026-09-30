@@ -8,6 +8,7 @@ import { excerpt } from "@/lib/story-doc";
 import { publicUrl } from "@/lib/storage";
 import { StoryBody } from "@/components/StoryBody";
 import { Avatar } from "@/components/ui/Avatar";
+import { PlaceMark } from "@/components/ui/PlaceMark";
 import { ButtonLink } from "@/components/ui/Button";
 
 async function load(handleSegment: string, slug: string) {
@@ -83,7 +84,15 @@ export default async function StoryPage({
 
       <article>
         <header>
-          <h1 className="text-balance text-4xl font-semibold leading-[1.12] tracking-tight sm:text-5xl">
+          {story.placeName && (
+            <div className="mb-5">
+              <PlaceMark
+                place={story.placeName}
+                countryCode={story.countryCode}
+              />
+            </div>
+          )}
+          <h1 className="font-display text-balance text-4xl font-semibold leading-[1.08] tracking-tight sm:text-5xl">
             {story.title || "Untitled"}
           </h1>
 
@@ -139,14 +148,14 @@ export default async function StoryPage({
 
       {/* Author card: the end of a story is the one moment a reader is most
           likely to want more from the same person. */}
-      <aside className="mt-16 rounded-2xl border border-rule bg-surface p-6">
+      <aside className="mt-16 rounded-2xl border border-rule bg-surface p-6 shadow-[var(--shadow)]">
         <div className="flex items-start gap-4">
           <Avatar name={profile.displayName} handle={profile.handle} size="md" />
           <div className="min-w-0 flex-1">
-            <p className="text-xs uppercase tracking-[0.15em] text-muted">
-              Written by
+            <p className="eyebrow">Written by</p>
+            <p className="font-display mt-1 text-lg font-semibold">
+              {profile.displayName}
             </p>
-            <p className="mt-1 font-medium">{profile.displayName}</p>
             {profile.bio && (
               <p className="mt-2 text-sm leading-relaxed text-muted">
                 {profile.bio}
