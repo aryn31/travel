@@ -4,7 +4,7 @@ import { media, profiles, stories } from "@/lib/db/schema";
 import { getViewer } from "@/lib/session";
 import { publicUrl } from "@/lib/storage";
 import { StoryList } from "@/components/StoryList";
-import { HeroMountains } from "@/components/HeroMountains";
+import { HeroPhoto } from "@/components/HeroPhoto";
 import { DestinationStrip } from "@/components/DestinationStrip";
 import { ButtonLink } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -73,15 +73,12 @@ export default async function Home() {
        * Hero
        * ---------------------------------------------------------------- */}
       <section className="relative isolate -mt-16 flex min-h-[80vh] items-end overflow-hidden sm:min-h-[86vh]">
-        <HeroMountains className="absolute inset-0 -z-10 h-full w-full" />
-        <div
-          aria-hidden
-          className="absolute inset-x-0 bottom-0 -z-10 h-44 bg-gradient-to-t from-background to-transparent"
-        />
-        <div
-          aria-hidden
-          className="absolute inset-x-0 top-0 -z-10 h-32 bg-gradient-to-b from-background/75 to-transparent"
-        />
+        <HeroPhoto className="absolute inset-0 -z-10 h-full w-full object-cover" />
+
+        {/* See .hero-veil / .hero-wash / .hero-foot in globals.css. */}
+        <div aria-hidden className="hero-veil" />
+        <div aria-hidden className="hero-wash" />
+        <div aria-hidden className="hero-foot" />
 
         <div className="mx-auto w-full max-w-3xl px-6 pb-16 pt-32 sm:pb-24">
           <p className="eyebrow mb-4 text-foreground/60">

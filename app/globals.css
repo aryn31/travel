@@ -17,6 +17,9 @@
   --sun: #c07c10;
   --shadow: 0 1px 2px rgba(60, 40, 25, 0.05), 0 8px 24px -12px rgba(60, 40, 25, 0.18);
   --texture: 0.035;
+  /* Light mode needs more veil: dark copy over a sunlit photo has less
+     natural separation than light copy over a darkened one. */
+  --hero-veil: 0.46;
 
   /* Hero palette -- clear morning. Each range back is lighter and lower
      contrast, which is what makes the depth read. */
@@ -73,6 +76,7 @@
     --sun: #ddb05c;
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 30px -14px rgba(0, 0, 0, 0.7);
     --texture: 0.05;
+    --hero-veil: 0.34;
 
     /* Dusk. The warm band at the horizon is what stops a dark hero from
        reading as a black rectangle. */
@@ -118,6 +122,47 @@ body::before {
   pointer-events: none;
   opacity: var(--texture);
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ------------------------------------------------------------------ *
+ * Hero scrim. The photograph is bright and busy, so three passes sit
+ * between it and the copy: an overall veil, a wash from the left where
+ * the text column is, and a foot that blends into the page. Tuned by
+ * eye against the actual image -- a single flat overlay either buried
+ * the photo or left the headline unreadable.
+ * ------------------------------------------------------------------ */
+
+.hero-veil,
+.hero-wash,
+.hero-foot {
+  position: absolute;
+  inset: 0;
+  z-index: -10;
+  pointer-events: none;
+}
+
+.hero-veil {
+  background: var(--background);
+  opacity: var(--hero-veil);
+}
+
+.hero-wash {
+  background: linear-gradient(
+    to right,
+    color-mix(in srgb, var(--background) 95%, transparent) 0%,
+    color-mix(in srgb, var(--background) 77%, transparent) 24%,
+    color-mix(in srgb, var(--background) 30%, transparent) 56%,
+    transparent 84%
+  );
+}
+
+.hero-foot {
+  background: linear-gradient(
+    to top,
+    var(--background) 0%,
+    color-mix(in srgb, var(--background) 70%, transparent) 11%,
+    transparent 36%
+  );
 }
 
 .font-display {

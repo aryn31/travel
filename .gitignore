@@ -46,3 +46,6 @@ next-env.d.ts
 
 # seed data
 /scripts/tmp-*
+
+# source photo (optimised copies live in public/hero)
+/sunny-day.jpg
