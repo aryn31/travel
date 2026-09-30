@@ -8,6 +8,7 @@ import { docToSummary, docToText, readingMinutes, type Node } from "../lib/story
 import { slugify } from "../lib/slug";
 import { landscapePng, type Palette } from "./photo";
 import { AUTHORS, type SeedBlock } from "./seed-content";
+import { TRIP_STORIES } from "./seed-trips";
 
 const SEED_DOMAIN = "@seed.local";
 
@@ -185,7 +186,10 @@ async function main() {
       homeCountry: author.home,
     });
 
-    for (const [i, story] of author.stories.entries()) {
+    // Short vignettes plus the long trip narratives for this author.
+    const authored = [...author.stories, ...(TRIP_STORIES[author.handle] ?? [])];
+
+    for (const [i, story] of authored.entries()) {
       const id = crypto.randomUUID();
       const published = story.daysAgo !== null;
       const publishedAt = published
@@ -234,7 +238,7 @@ async function main() {
       photoCount += images + (cover ? 1 : 0);
     }
 
-    console.log(`  @${author.handle.padEnd(9)} ${author.stories.length} stories`);
+    console.log(`  @${author.handle.padEnd(9)} ${authored.length} stories`);
   }
 
   // Any media row whose file is missing gets a regenerated placeholder at the

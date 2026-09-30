@@ -43,12 +43,10 @@ export default async function Home() {
       : null,
   }));
 
-  // One row per country, labelled with the most recent place written about
-  // there. Discovery and decoration at the same time.
+  // One row per country. Discovery and decoration at the same time.
   const destinations = await db
     .select({
       code: sql<string>`${stories.countryCode}`.as("code"),
-      place: sql<string>`max(${stories.placeName})`.as("place"),
       count: sql<number>`count(*)::int`.as("count"),
     })
     .from(stories)
