@@ -66,7 +66,7 @@ export default async function StoryPage({
   if (story.status === "draft" && !isAuthor) notFound();
 
   return (
-    <main className="mx-auto w-full max-w-2xl flex-1 px-6 py-12 pb-24">
+    <main className="page flex-1 py-12 pb-24">
       {isAuthor && story.status !== "published" && (
         <div className="mb-10 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-accent/30 bg-accent-soft px-4 py-3 text-sm">
           <span>
@@ -83,7 +83,7 @@ export default async function StoryPage({
       )}
 
       <article>
-        <header>
+        <header className="max-w-5xl">
           {story.placeName && (
             <div className="mb-5">
               <PlaceMark
@@ -92,44 +92,13 @@ export default async function StoryPage({
               />
             </div>
           )}
-          <h1 className="font-display text-balance text-4xl font-semibold leading-[1.08] tracking-tight sm:text-5xl">
+          <h1 className="font-display text-balance text-4xl font-semibold leading-[1.05] tracking-tight sm:text-6xl">
             {story.title || "Untitled"}
           </h1>
-
-          <div className="mt-7 flex items-center gap-3">
-            <Link href={`/@${profile.handle}`} className="shrink-0">
-              <Avatar name={profile.displayName} handle={profile.handle} />
-            </Link>
-            <div className="text-sm leading-tight">
-              <Link
-                href={`/@${profile.handle}`}
-                className="font-medium transition-colors hover:text-accent"
-              >
-                {profile.displayName}
-              </Link>
-              <p className="mt-1 flex flex-wrap items-center gap-x-2 text-muted">
-                {story.publishedAt && (
-                  <time dateTime={story.publishedAt.toISOString()}>
-                    {story.publishedAt.toLocaleDateString(undefined, {
-                      year: "numeric",
-                      month: "long",
-                      day: "numeric",
-                    })}
-                  </time>
-                )}
-                {story.readingMinutes > 0 && (
-                  <>
-                    <span aria-hidden>·</span>
-                    <span>{story.readingMinutes} min read</span>
-                  </>
-                )}
-              </p>
-            </div>
-          </div>
         </header>
 
         {cover && (
-          <figure className="mt-10 -mx-6 sm:mx-0">
+          <figure className="mt-10 -mx-6 sm:mx-0 lg:-mx-10">
             {/* eslint-disable-next-line @next/next/no-img-element -- see StoryBody */}
             <img
               src={publicUrl(cover.storageKey)}
@@ -141,45 +110,87 @@ export default async function StoryPage({
           </figure>
         )}
 
-        <div className="mt-8">
-          <StoryBody doc={story.bodyJson} />
+        {/*
+          Full page width, with the byline moved into a column beside the
+          prose rather than stacked above it. That fills the page without
+          setting paragraphs at 130 characters a line -- the type steps up a
+          size as well, so the wider column still reads at a sane measure.
+        */}
+        <div className="mt-12 grid gap-10 lg:grid-cols-[minmax(0,1fr)_16rem] lg:gap-16">
+          <div className="min-w-0">
+            <StoryBody doc={story.bodyJson} />
+          </div>
+
+          <aside className="lg:order-2">
+            <div className="lg:sticky lg:top-24">
+              <div className="flex items-center gap-3 border-t border-rule pt-5 lg:border-0 lg:pt-0">
+                <Link href={`/@${profile.handle}`} className="shrink-0">
+                  <Avatar name={profile.displayName} handle={profile.handle} />
+                </Link>
+                <div className="min-w-0 text-sm leading-tight">
+                  <p className="eyebrow">Written by</p>
+                  <Link
+                    href={`/@${profile.handle}`}
+                    className="font-display mt-1 block text-base font-semibold transition-colors hover:text-accent"
+                  >
+                    {profile.displayName}
+                  </Link>
+                </div>
+              </div>
+
+              {profile.bio && (
+                <p className="mt-4 text-sm leading-relaxed text-muted">
+                  {profile.bio}
+                </p>
+              )}
+
+              <dl className="mt-5 space-y-1.5 border-t border-rule pt-5 text-sm text-muted">
+                {story.publishedAt && (
+                  <div>
+                    <dt className="sr-only">Published</dt>
+                    <dd>
+                      <time dateTime={story.publishedAt.toISOString()}>
+                        {story.publishedAt.toLocaleDateString(undefined, {
+                          year: "numeric",
+                          month: "long",
+                          day: "numeric",
+                        })}
+                      </time>
+                    </dd>
+                  </div>
+                )}
+                {story.readingMinutes > 0 && (
+                  <div>
+                    <dt className="sr-only">Reading time</dt>
+                    <dd>{story.readingMinutes} min read</dd>
+                  </div>
+                )}
+              </dl>
+
+              <div className="mt-6">
+                <ButtonLink
+                  href={`/@${profile.handle}`}
+                  variant="secondary"
+                  size="sm"
+                >
+                  More stories
+                </ButtonLink>
+              </div>
+
+              {isAuthor && (
+                <p className="mt-6 text-sm text-muted">
+                  <Link
+                    href={`/write/${story.id}`}
+                    className="underline underline-offset-2 hover:text-foreground"
+                  >
+                    Edit this story
+                  </Link>
+                </p>
+              )}
+            </div>
+          </aside>
         </div>
       </article>
-
-      {/* Author card: the end of a story is the one moment a reader is most
-          likely to want more from the same person. */}
-      <aside className="mt-16 rounded-2xl border border-rule bg-surface p-6 shadow-[var(--shadow)]">
-        <div className="flex items-start gap-4">
-          <Avatar name={profile.displayName} handle={profile.handle} size="md" />
-          <div className="min-w-0 flex-1">
-            <p className="eyebrow">Written by</p>
-            <p className="font-display mt-1 text-lg font-semibold">
-              {profile.displayName}
-            </p>
-            {profile.bio && (
-              <p className="mt-2 text-sm leading-relaxed text-muted">
-                {profile.bio}
-              </p>
-            )}
-          </div>
-          <ButtonLink
-            href={`/@${profile.handle}`}
-            variant="secondary"
-            size="sm"
-            className="shrink-0"
-          >
-            More stories
-          </ButtonLink>
-        </div>
-      </aside>
-
-      {isAuthor && story.status === "published" && (
-        <p className="mt-8 text-sm text-muted">
-          <Link href={`/write/${story.id}`} className="underline underline-offset-2">
-            Edit this story
-          </Link>
-        </p>
-      )}
     </main>
   );
 }

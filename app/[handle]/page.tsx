@@ -85,7 +85,7 @@ export default async function ProfilePage({ params }: PageProps<"/[handle]">) {
   return (
     <main className="flex-1">
       <header className="border-b border-rule bg-surface">
-        <div className="mx-auto w-full max-w-3xl px-6 py-12 sm:py-16">
+        <div className="page py-12 sm:py-16">
           <div className="flex flex-wrap items-start justify-between gap-6">
             <div className="flex items-center gap-5">
               <Avatar name={profile.displayName} handle={profile.handle} size="lg" />
@@ -133,7 +133,7 @@ export default async function ProfilePage({ params }: PageProps<"/[handle]">) {
         </div>
       </header>
 
-      <div className="mx-auto w-full max-w-3xl px-6 py-10 pb-24">
+      <div className="page py-10 pb-24">
         {published.length === 0 ? (
           <EmptyState title={isMe ? "Nothing published yet" : "No stories yet"}>
             {isMe ? (

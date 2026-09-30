@@ -1,25 +1,55 @@
 @import "tailwindcss";
 
 :root {
+  color-scheme: light;
+
   /* Warm paper rather than white. A neutral grey page makes travel writing
      look like a spreadsheet; the whole palette is pulled toward sand, clay
      and sea so the photographs sit in something. */
-  --background: #fbf7f1;
-  --foreground: #1c1714;
-  --muted: #6b5f55;
-  --faint: #9c8e82;
-  --rule: rgba(28, 23, 20, 0.1);
-  --surface: #f4ece0;
-  --surface-hover: #ede3d4;
-  --accent: #b4511f;      /* terracotta */
-  --accent-soft: rgba(180, 81, 31, 0.1);
-  --sea: #2f6f6b;         /* used for place + country marks */
-  --sun: #c07c10;
+  --background: #fcf7ec;
+  --foreground: #191310;
+  --muted: #6a5c50;
+  --faint: #a2927f;
+  --rule: rgba(25, 19, 16, 0.12);
+  --surface: #f5ead7;
+  --surface-hover: #efe1c9;
+
+  /* Vintage travel-poster set. Six hues that hold their own against a
+     photograph, used for section tints, card accents and the quote. */
+  --accent: #c2451a;          /* vermilion */
+  --accent-soft: rgba(194, 69, 26, 0.12);
+  --sea: #10716d;             /* deep teal */
+  --sun: #d1900f;             /* mustard */
+  --indigo: #2f4480;
+  --moss: #4f7233;
+  --plum: #8a3663;
   --shadow: 0 1px 2px rgba(60, 40, 25, 0.05), 0 8px 24px -12px rgba(60, 40, 25, 0.18);
   --texture: 0.035;
-  /* Light mode needs more veil: dark copy over a sunlit photo has less
-     natural separation than light copy over a darkened one. */
-  --hero-veil: 0.46;
+  /*
+   * Light mode: almost no overall veil. Dark copy needs a light ground, but
+   * whitening the *whole* frame just turns a sunlit photograph milky -- so
+   * the lifting happens in the left wash where the text actually sits, and
+   * the rest of the picture is left alone.
+   */
+  --hero-veil: 0.06;
+  --hero-wash-a: 95%;
+  --hero-wash-b: 86%;
+  --hero-wash-c: 40%;
+  --hero-wash-end: 80%;
+  --hero-cap-a: 88%;
+  --hero-cap-b: 64%;
+  --hero-cap-c: 26%;
+
+  /* Section tints. Deliberately close to the page colour -- the point is to
+     give each band its own temperature, not to turn the page into a swatch
+     chart. Stories always sit on plain --background so nothing competes
+     with the photographs. */
+  --topo-opacity: 0.05;
+  --tint-sand: #f9e6c8;
+  --tint-sea: #d2ece8;
+  --tint-olive: #e2edd1;
+  --tint-clay: #fce0cd;
+  --tint-plum: #f2dfea;
 
   /* Hero palette -- clear morning. Each range back is lighter and lower
      contrast, which is what makes the depth read. */
@@ -55,28 +85,63 @@
   --color-accent-soft: var(--accent-soft);
   --color-sea: var(--sea);
   --color-sun: var(--sun);
+  --color-indigo: var(--indigo);
+  --color-moss: var(--moss);
+  --color-plum: var(--plum);
+  --color-tint-sand: var(--tint-sand);
+  --color-tint-sea: var(--tint-sea);
+  --color-tint-olive: var(--tint-olive);
+  --color-tint-clay: var(--tint-clay);
+  --color-tint-plum: var(--tint-plum);
   --font-display: var(--font-display);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    /* Evening, not void. Brown-black keeps the warmth after dark. */
-    --background: #14100d;
-    --foreground: #f2ebe3;
-    --muted: #a89787;
-    --faint: #6f6155;
-    --rule: rgba(242, 235, 227, 0.12);
-    --surface: #1e1813;
-    --surface-hover: #271f18;
-    --accent: #e2864f;
-    --accent-soft: rgba(226, 134, 79, 0.15);
-    --sea: #7ab9ad;
-    --sun: #ddb05c;
-    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 30px -14px rgba(0, 0, 0, 0.7);
-    --texture: 0.05;
-    --hero-veil: 0.34;
+/*
+ * Dark is keyed off an explicit attribute rather than the media query. A
+ * blocking script in the layout resolves the user's stored choice (or the
+ * system preference when they haven't chosen) into data-theme before first
+ * paint, so there is one source of truth and no flash.
+ *
+ * Trade-off: with JavaScript disabled everyone gets the light theme.
+ */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  /* Evening, not void. Brown-black keeps the warmth after dark, and the six
+     hues are lifted so they hold up on it. */
+  --background: #14100c;
+  --foreground: #f6eee2;
+  --muted: #b2a08d;
+  --faint: #756557;
+  --rule: rgba(246, 238, 226, 0.14);
+  --surface: #211a14;
+  --surface-hover: #2b221a;
+
+  --accent: #f27a45;
+  --accent-soft: rgba(242, 122, 69, 0.16);
+  --sea: #4ec4b6;
+  --sun: #f0bb4e;
+  --indigo: #7f95dd;
+  --moss: #9cc46a;
+  --plum: #d98ab6;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 30px -14px rgba(0, 0, 0, 0.7);
+  --texture: 0.05;
+  --hero-veil: 0.34;
+  --hero-wash-a: 95%;
+  --hero-wash-b: 77%;
+  --hero-wash-c: 30%;
+  --hero-wash-end: 84%;
+  --hero-cap-a: 95%;
+  --hero-cap-b: 80%;
+  --hero-cap-c: 45%;
+
+  --tint-sand: #2a1d0f;
+  --tint-sea: #0c2528;
+  --tint-olive: #1b250d;
+  --tint-clay: #31190b;
+  --tint-plum: #271428;
 
     /* Dusk. The warm band at the horizon is what stops a dark hero from
        reading as a black rectangle. */
@@ -98,7 +163,6 @@
     --hero-rim-mid: 0.3;
     --hero-rim-near: 0.18;
     --hero-grain: 0.06;
-  }
 }
 
 body {
@@ -132,6 +196,37 @@ body::before {
  * the photo or left the headline unreadable.
  * ------------------------------------------------------------------ */
 
+/*
+ * Hero photograph. Light gets the beach, dark gets the autumn lake -- a
+ * sunlit beach under a dark palette looks wrong, and the lake at night suits
+ * it. Declared per theme so the browser only fetches the one in use.
+ */
+.hero-photo {
+  background-image: url("/hero/beach-1280.jpg");
+  /* Crop favours the sky and the full palm; the sand at the foot then runs
+     straight into the sand-tinted band below. */
+  background-position: center 42%;
+  background-size: cover;
+  background-repeat: no-repeat;
+}
+
+@media (min-width: 1281px) {
+  .hero-photo {
+    background-image: url("/hero/beach-1920.jpg");
+  }
+}
+
+:root[data-theme="dark"] .hero-photo {
+  background-image: url("/hero/sunny-day-1280.jpg");
+  background-position: center;
+}
+
+@media (min-width: 1281px) {
+  :root[data-theme="dark"] .hero-photo {
+    background-image: url("/hero/sunny-day-1920.jpg");
+  }
+}
+
 .hero-veil,
 .hero-wash,
 .hero-foot {
@@ -149,20 +244,277 @@ body::before {
 .hero-wash {
   background: linear-gradient(
     to right,
-    color-mix(in srgb, var(--background) 95%, transparent) 0%,
-    color-mix(in srgb, var(--background) 77%, transparent) 24%,
-    color-mix(in srgb, var(--background) 30%, transparent) 56%,
-    transparent 84%
+    color-mix(in srgb, var(--background) var(--hero-wash-a), transparent) 0%,
+    color-mix(in srgb, var(--background) var(--hero-wash-b), transparent) 26%,
+    color-mix(in srgb, var(--background) var(--hero-wash-c), transparent) 58%,
+    transparent var(--hero-wash-end)
   );
 }
 
 .hero-foot {
   background: linear-gradient(
     to top,
-    var(--background) 0%,
-    color-mix(in srgb, var(--background) 70%, transparent) 11%,
-    transparent 36%
+    var(--tint-sand) 0%,
+    color-mix(in srgb, var(--tint-sand) 70%, transparent) 12%,
+    transparent 38%
   );
+}
+
+/*
+ * Protects the fixed header. The nav sits over the top-right of the
+ * photograph, which on this image is bright foliage -- without this the
+ * links are unreadable until the page is scrolled and the header gains its
+ * own backdrop. Short enough not to eat into the picture.
+ */
+.hero-cap {
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  height: 9rem;
+  z-index: -10;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--background) var(--hero-cap-a), transparent) 0%,
+    color-mix(in srgb, var(--background) var(--hero-cap-b), transparent) 30%,
+    color-mix(in srgb, var(--background) var(--hero-cap-c), transparent) 60%,
+    transparent 100%
+  );
+}
+
+/* ------------------------------------------------------------------ *
+ * Layout
+ * ------------------------------------------------------------------ */
+
+/* The page gutter. One place to change how wide the site runs. */
+.page {
+  width: 100%;
+  max-width: 82rem;
+  margin-inline: auto;
+  padding-inline: 1.5rem;
+}
+
+@media (min-width: 1024px) {
+  .page { padding-inline: 2.5rem; }
+}
+
+/*
+ * Reading measure. Deliberately NOT the page width: prose sets at 90+
+ * characters a line is measurably harder to read, and a travel site whose
+ * whole point is long-form writing should not make the writing hostile.
+ * Story text stays here while covers and pull quotes use the full page.
+ */
+.reading {
+  width: 100%;
+  max-width: 44rem;
+  margin-inline: auto;
+}
+
+/*
+ * Full-bleed colour bands. The page container is nested inside so the tint
+ * runs edge to edge while the content stays on the grid.
+ */
+.band {
+  width: 100%;
+  border-block: 1px solid var(--rule);
+}
+
+/*
+ * Topographic contour lines. It is a map pattern on a site about going
+ * places -- decoration that is at least on topic. Faint enough to sit under
+ * text without competing, and it tiles, so it costs one small data URI.
+ */
+.topo {
+  position: relative;
+}
+
+.topo::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: var(--topo-opacity);
+  background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%27320%27%20height%3D%27320%27%20viewBox%3D%270%200%20320%20320%27%3E%3Cg%20fill%3D%27none%27%20stroke%3D%27%2523000000%27%20stroke-width%3D%271.1%27%3E%3Cpath%20d%3D%27M-20%2C60%20C60%2C20%20120%2C100%20200%2C70%20C260%2C48%20300%2C90%20340%2C64%27%2F%3E%3Cpath%20d%3D%27M-20%2C92%20C60%2C52%20120%2C132%20200%2C102%20C260%2C80%20300%2C122%20340%2C96%27%2F%3E%3Cpath%20d%3D%27M-20%2C124%20C60%2C84%20120%2C164%20200%2C134%20C260%2C112%20300%2C154%20340%2C128%27%2F%3E%3Cpath%20d%3D%27M-20%2C188%20C70%2C150%20130%2C226%20210%2C198%20C270%2C178%20305%2C214%20340%2C192%27%2F%3E%3Cpath%20d%3D%27M-20%2C220%20C70%2C182%20130%2C258%20210%2C230%20C270%2C210%20305%2C246%20340%2C224%27%2F%3E%3Cpath%20d%3D%27M-20%2C252%20C70%2C214%20130%2C290%20210%2C262%20C270%2C242%20305%2C278%20340%2C256%27%2F%3E%3Cellipse%20cx%3D%2796%27%20cy%3D%27158%27%20rx%3D%2734%27%20ry%3D%2716%27%2F%3E%3Cellipse%20cx%3D%2796%27%20cy%3D%27158%27%20rx%3D%2718%27%20ry%3D%278%27%2F%3E%3Cellipse%20cx%3D%27248%27%20cy%3D%2730%27%20rx%3D%2730%27%20ry%3D%2714%27%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E");
+  background-size: 320px 320px;
+}
+
+:root[data-theme="dark"] .topo::before {
+  background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%27320%27%20height%3D%27320%27%20viewBox%3D%270%200%20320%20320%27%3E%3Cg%20fill%3D%27none%27%20stroke%3D%27%2523ffffff%27%20stroke-width%3D%271.1%27%3E%3Cpath%20d%3D%27M-20%2C60%20C60%2C20%20120%2C100%20200%2C70%20C260%2C48%20300%2C90%20340%2C64%27%2F%3E%3Cpath%20d%3D%27M-20%2C92%20C60%2C52%20120%2C132%20200%2C102%20C260%2C80%20300%2C122%20340%2C96%27%2F%3E%3Cpath%20d%3D%27M-20%2C124%20C60%2C84%20120%2C164%20200%2C134%20C260%2C112%20300%2C154%20340%2C128%27%2F%3E%3Cpath%20d%3D%27M-20%2C188%20C70%2C150%20130%2C226%20210%2C198%20C270%2C178%20305%2C214%20340%2C192%27%2F%3E%3Cpath%20d%3D%27M-20%2C220%20C70%2C182%20130%2C258%20210%2C230%20C270%2C210%20305%2C246%20340%2C224%27%2F%3E%3Cpath%20d%3D%27M-20%2C252%20C70%2C214%20130%2C290%20210%2C262%20C270%2C242%20305%2C278%20340%2C256%27%2F%3E%3Cellipse%20cx%3D%2796%27%20cy%3D%27158%27%20rx%3D%2734%27%20ry%3D%2716%27%2F%3E%3Cellipse%20cx%3D%2796%27%20cy%3D%27158%27%20rx%3D%2718%27%20ry%3D%278%27%2F%3E%3Cellipse%20cx%3D%27248%27%20cy%3D%2730%27%20rx%3D%2730%27%20ry%3D%2714%27%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E");
+}
+
+.topo > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* The hero fades directly into the first band; a rule between them would
+   just draw a line across the blend. */
+section + .band {
+  border-top: 0;
+}
+
+.band + .band {
+  border-top: 0;
+}
+
+/* ------------------------------------------------------------------ *
+ * Motion
+ *
+ * Everything here is opt-in via the `js` class the theme script adds, so
+ * with JavaScript off nothing is hidden waiting for an observer that will
+ * never run. The reduced-motion block further up already neutralises all of
+ * it; the explicit rules below make sure content still ends up visible
+ * rather than stuck at opacity 0.
+ * ------------------------------------------------------------------ */
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/*
+ * Destination ticker. The list is rendered twice and the track slides by
+ * exactly half its width, so the loop is seamless with no JavaScript and no
+ * jump at the wrap point.
+ */
+/*
+ * Postage-stamp perforation. Circles in the page colour straddle the top and
+ * bottom edges of a band, so the band reads as torn from a sheet of stamps.
+ * Cheaper and sharper than an SVG edge, and it tiles to any width.
+ */
+.perforate::before,
+.perforate::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 18px;
+  z-index: 2;
+  pointer-events: none;
+  background-image: radial-gradient(
+    circle 9px at 12px 9px,
+    var(--background) 97%,
+    transparent 100%
+  );
+  background-size: 26px 18px;
+  background-repeat: repeat-x;
+}
+
+.perforate::before { top: -9px; }
+.perforate::after { bottom: -9px; }
+
+@keyframes seal-turn {
+  to { transform: rotate(360deg); }
+}
+
+.seal-spin {
+  animation: seal-turn 34s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .seal-spin { animation: none; }
+}
+
+/*
+ * Outlined display numerals for section headings. text-stroke has no
+ * non-prefixed form that browsers actually ship, so the prefixed property is
+ * the real one here.
+ */
+.numeral-outline {
+  color: transparent;
+  -webkit-text-stroke: 1.5px var(--accent);
+  opacity: 0.55;
+}
+
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+.marquee {
+  display: flex;
+  width: max-content;
+  animation: marquee 48s linear infinite;
+}
+
+.marquee:hover,
+.marquee:focus-within {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marquee {
+    animation: none;
+    /* Still reachable: it becomes an ordinary scrollable row. */
+    width: auto;
+    overflow-x: auto;
+  }
+}
+
+/* Fades the ticker out at both ends instead of cutting chips in half. */
+.marquee-mask {
+  mask-image: linear-gradient(to right, transparent, black 4rem, black calc(100% - 4rem), transparent);
+}
+
+@keyframes fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Revealed on scroll by components/Reveal.tsx. */
+.js .reveal {
+  opacity: 0;
+}
+
+.js .reveal.is-visible {
+  animation: rise 0.75s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+/* The hero animates on load rather than on scroll -- it is already in view. */
+.js .hero-in > * {
+  animation: rise 0.9s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+.js .hero-in > *:nth-child(1) { animation-delay: 0.08s; }
+.js .hero-in > *:nth-child(2) { animation-delay: 0.18s; }
+.js .hero-in > *:nth-child(3) { animation-delay: 0.3s; }
+.js .hero-in > *:nth-child(4) { animation-delay: 0.42s; }
+
+/* The photograph settles in behind the words. */
+.js .hero-photo {
+  animation: fade 1.4s ease-out both, hero-settle 2.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes hero-settle {
+  from { transform: scale(1.06); }
+  to { transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .js .reveal,
+  .js .reveal.is-visible,
+  .js .hero-in > *,
+  .js .hero-photo {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
+
+/* Theme switching shouldn't snap. Limited to colour so layout never animates. */
+body,
+.band,
+.hero-photo {
+  transition:
+    background-color 0.35s ease,
+    color 0.35s ease;
 }
 
 .font-display {

@@ -180,8 +180,10 @@ export function StoryBody({ doc }: { doc: unknown }) {
   // Story prose sits in the display serif at reading optical size -- the
   // same family as the headline, which is what makes a page read as one
   // piece rather than as a template with content poured in.
+  // Type steps up on wide screens: the column grows with the page, so the
+  // font has to grow with it or the line runs to ~95 characters.
   return (
-    <div className="font-display text-[1.19rem]">
+    <div className="font-display text-[1.19rem] lg:text-[1.33rem]">
       {renderNodes(doc.content, "n")}
     </div>
   );

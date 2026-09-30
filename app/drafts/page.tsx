@@ -28,7 +28,7 @@ export default async function DraftsPage() {
   const handle = viewer.profile.handle;
 
   return (
-    <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-12 pb-24">
+    <main className="page flex-1 py-12 pb-24">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="font-display text-4xl font-semibold tracking-tight">Your stories</h1>
@@ -137,12 +137,12 @@ function StoryRow({
           alt=""
           width={cover.width}
           height={cover.height}
-          className="size-14 shrink-0 rounded-lg bg-rule object-cover"
+          className="h-16 w-24 shrink-0 rounded-lg bg-rule object-cover"
         />
       ) : (
         <span
           aria-hidden
-          className="size-14 shrink-0 rounded-lg border border-dashed border-rule"
+          className="h-16 w-24 shrink-0 rounded-lg border border-dashed border-rule"
         />
       )}
 

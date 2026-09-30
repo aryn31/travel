@@ -237,7 +237,7 @@ export function Editor({
   }
 
   return (
-    <div className="mx-auto w-full max-w-2xl flex-1 px-6 py-10">
+    <div className="page flex-1 py-10"><div className="reading">
       <div className="mb-8 flex items-center justify-between gap-4 text-sm">
         <StatusLine state={save} status={status} publicUrl={publicUrl} />
         <div className="flex items-center gap-3">
@@ -360,6 +360,7 @@ export function Editor({
           if (file) void handleCover(file);
         }}
       />
+      </div>
     </div>
   );
 }

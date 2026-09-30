@@ -21,7 +21,7 @@ const SIZES: Record<Size, string> = {
 };
 
 const BASE =
-  "inline-flex items-center justify-center gap-2 rounded-full font-medium transition-all disabled:pointer-events-none";
+  "inline-flex items-center justify-center gap-2 rounded-full font-medium transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 disabled:pointer-events-none disabled:hover:translate-y-0";
 
 export function buttonClass(variant: Variant = "primary", size: Size = "md") {
   return `${BASE} ${VARIANTS[variant]} ${SIZES[size]}`;

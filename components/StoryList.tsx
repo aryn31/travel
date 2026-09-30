@@ -55,10 +55,23 @@ function Byline({ story, showAuthor }: { story: StoryCard; showAuthor: boolean }
 /** The newest story, given the space of a magazine opener. */
 function Featured({ story, showAuthor }: { story: StoryCard; showAuthor: boolean }) {
   return (
-    <article className="group">
-      <Link href={`/@${story.handle}/${story.slug}`} className="block">
-        {story.cover && (
-          <div className="relative mb-6 overflow-hidden rounded-2xl bg-surface shadow-[var(--shadow)]">
+    // Stacked on narrow screens, side by side once there is room -- a single
+    // column lead on a 1300px page is mostly empty margin.
+    <article className="group grid items-center gap-8 lg:grid-cols-[1.3fr_1fr] lg:gap-14">
+      {story.cover && (
+        <Link
+          href={`/@${story.handle}/${story.slug}`}
+          className="relative block lg:order-2"
+          tabIndex={-1}
+          aria-hidden
+        >
+          {/* Solid colour block sitting behind and offset from the photo --
+              the printed-poster trick. Purely decorative. */}
+          <span
+            aria-hidden
+            className="absolute inset-0 -z-10 translate-x-3 translate-y-3 rounded-2xl bg-sea sm:translate-x-4 sm:translate-y-4"
+          />
+          <div className="relative overflow-hidden rounded-2xl border-2 border-foreground/80 bg-surface">
             {/* eslint-disable-next-line @next/next/no-img-element -- see StoryBody */}
             <img
               src={story.cover.url}
@@ -69,7 +82,7 @@ function Featured({ story, showAuthor }: { story: StoryCard; showAuthor: boolean
             />
             {story.placeName && (
               <div className="absolute bottom-4 left-4">
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-background/90 px-3 py-1.5 text-sm font-medium backdrop-blur-sm">
+                <span className="inline-flex items-center rounded-full bg-background/90 px-1 py-1 backdrop-blur-sm">
                   <PlaceMark
                     place={story.placeName}
                     countryCode={story.countryCode}
@@ -78,17 +91,44 @@ function Featured({ story, showAuthor }: { story: StoryCard; showAuthor: boolean
                 </span>
               </div>
             )}
+
+            {/* Passport-stamp badge: tilted, ruled, deliberately rough. */}
+            <span
+              aria-hidden
+              className="absolute right-4 top-4 -rotate-12 rounded-lg border-2 border-dashed border-accent bg-background/85 px-3 py-1.5 text-center shadow-[var(--shadow)] backdrop-blur-sm"
+            >
+              <span className="block text-[0.6rem] font-bold uppercase tracking-[0.18em] text-accent">
+                Latest
+              </span>
+              {story.publishedAt && (
+                <span className="block text-[0.6rem] font-medium uppercase tracking-wider text-accent/80">
+                  {story.publishedAt.toLocaleDateString(undefined, {
+                    day: "2-digit",
+                    month: "short",
+                  })}
+                </span>
+              )}
+            </span>
           </div>
-        )}
-        <h3 className="font-display text-balance text-3xl font-semibold leading-[1.15] tracking-tight decoration-2 underline-offset-4 group-hover:underline sm:text-4xl">
-          {story.title || "Untitled"}
-        </h3>
-        <p className="mt-3 line-clamp-3 text-lg leading-relaxed text-muted">
-          {excerpt(story.excerpt || story.bodyText, 240)}
-        </p>
-      </Link>
-      <div className="mt-4">
-        <Byline story={story} showAuthor={showAuthor} />
+        </Link>
+      )}
+
+      <div className="lg:order-1">
+        <span
+          aria-hidden
+          className="mb-5 block h-2 w-24 rounded-full bg-gradient-to-r from-accent via-sun to-sea"
+        />
+        <Link href={`/@${story.handle}/${story.slug}`} className="block">
+          <h3 className="font-display text-balance text-4xl font-semibold leading-[1.02] tracking-tight decoration-4 underline-offset-8 group-hover:underline sm:text-5xl lg:text-6xl">
+            {story.title || "Untitled"}
+          </h3>
+          <p className="mt-5 line-clamp-4 border-l-4 border-accent/60 pl-5 text-lg leading-relaxed text-muted">
+            {excerpt(story.excerpt || story.bodyText, 280)}
+          </p>
+        </Link>
+        <div className="mt-6">
+          <Byline story={story} showAuthor={showAuthor} />
+        </div>
       </div>
     </article>
   );
@@ -108,7 +148,9 @@ function Row({ story, showAuthor }: { story: StoryCard; showAuthor: boolean }) {
               />
             </div>
           )}
-          <Link href={`/@${story.handle}/${story.slug}`} className="block">
+          {/* Capped measure: on a full-width page these excerpts were
+              setting past 110 characters a line. */}
+          <Link href={`/@${story.handle}/${story.slug}`} className="block max-w-[52ch]">
             <h3 className="font-display text-balance text-xl font-semibold leading-snug decoration-2 underline-offset-4 group-hover:underline sm:text-2xl">
               {story.title || "Untitled"}
             </h3>
@@ -134,7 +176,7 @@ function Row({ story, showAuthor }: { story: StoryCard; showAuthor: boolean }) {
               alt=""
               width={story.cover.width}
               height={story.cover.height}
-              className="h-24 w-32 object-cover transition-transform duration-500 group-hover:scale-105 sm:h-28 sm:w-44"
+              className="h-24 w-32 object-cover transition-transform duration-500 group-hover:scale-105 sm:h-32 sm:w-52"
             />
           </Link>
         )}

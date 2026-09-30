@@ -125,6 +125,28 @@ export function excerpt(text: string, max = 180): string {
   return `${flat.slice(0, max).replace(/\s+\S*$/, "")}…`;
 }
 
+/**
+ * The first pull quote in a story, if it has one. Used to break the rhythm of
+ * the home page with a line in the author's own voice rather than another
+ * card that looks like the last card.
+ */
+export function firstQuote(doc: unknown): string | null {
+  if (!isDoc(doc)) return null;
+
+  let found: string | null = null;
+  const walk = (node: Node) => {
+    if (found) return;
+    if (node.type === "blockquote") {
+      const text = collectText(node).trim();
+      if (text.length >= 40 && text.length <= 240) found = text;
+      return;
+    }
+    for (const child of node.content ?? []) walk(child);
+  };
+  for (const node of doc.content) walk(node);
+  return found;
+}
+
 /** Image keys referenced by a doc, so orphaned uploads can be spotted later. */
 export function imageUrls(doc: unknown): string[] {
   if (!isDoc(doc)) return [];

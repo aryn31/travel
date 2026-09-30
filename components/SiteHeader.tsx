@@ -3,6 +3,7 @@ import { getViewer } from "@/lib/session";
 import { Avatar } from "./ui/Avatar";
 import { ButtonLink } from "./ui/Button";
 import { HeaderShell } from "./HeaderShell";
+import { ThemeToggle } from "./ThemeToggle";
 import { SignOutButton } from "./SignOutButton";
 
 export async function SiteHeader() {
@@ -10,7 +11,7 @@ export async function SiteHeader() {
 
   return (
     <HeaderShell>
-      <div className="mx-auto flex w-full max-w-3xl items-center justify-between px-6 py-4">
+      <div className="page flex items-center justify-between py-4">
         <Link href="/" className="font-display text-lg font-semibold tracking-tight">
           Travel Stories
         </Link>
@@ -36,11 +37,15 @@ export async function SiteHeader() {
                 <NavLink href="/onboarding">Finish setup</NavLink>
               )}
               <SignOutButton />
+              <ThemeToggle />
             </>
           ) : (
-            <ButtonLink href="/signin" size="sm">
-              Sign in
-            </ButtonLink>
+            <>
+              <ThemeToggle />
+              <ButtonLink href="/signin" size="sm">
+                Sign in
+              </ButtonLink>
+            </>
           )}
         </nav>
       </div>
@@ -52,7 +57,7 @@ function NavLink({ href, children }: { href: string; children: React.ReactNode }
   return (
     <Link
       href={href}
-      className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
+      className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-foreground/75 transition-colors hover:bg-surface-hover hover:text-foreground"
     >
       {children}
     </Link>

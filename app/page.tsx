@@ -3,11 +3,19 @@ import { db } from "@/lib/db";
 import { media, profiles, stories } from "@/lib/db/schema";
 import { getViewer } from "@/lib/session";
 import { publicUrl } from "@/lib/storage";
+import { firstQuote } from "@/lib/story-doc";
 import { StoryList } from "@/components/StoryList";
 import { HeroPhoto } from "@/components/HeroPhoto";
-import { DestinationStrip } from "@/components/DestinationStrip";
+import { DestinationTicker } from "@/components/home/DestinationTicker";
+import { StoryPair } from "@/components/home/StoryGrid";
+import { StoryMosaic } from "@/components/home/StoryMosaic";
+import { RotatingSeal } from "@/components/home/RotatingSeal";
+import { QuoteBreak } from "@/components/home/QuoteBreak";
+import { WritersRow } from "@/components/home/WritersRow";
+import { WriteInvite } from "@/components/home/WriteInvite";
 import { ButtonLink } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { Reveal } from "@/components/Reveal";
 
 export default async function Home() {
   const viewer = await getViewer();
@@ -19,6 +27,7 @@ export default async function Home() {
       title: stories.title,
       excerpt: stories.excerpt,
       bodyText: stories.bodyText,
+      bodyJson: stories.bodyJson,
       readingMinutes: stories.readingMinutes,
       publishedAt: stories.publishedAt,
       placeName: stories.placeName,
@@ -34,7 +43,7 @@ export default async function Home() {
     .leftJoin(media, eq(media.id, stories.coverMediaId))
     .where(eq(stories.status, "published"))
     .orderBy(desc(stories.publishedAt))
-    .limit(21);
+    .limit(24);
 
   const recent = rows.map((r) => ({
     ...r,
@@ -43,7 +52,6 @@ export default async function Home() {
       : null,
   }));
 
-  // One row per country. Discovery and decoration at the same time.
   const destinations = await db
     .select({
       code: sql<string>`${stories.countryCode}`.as("code"),
@@ -57,7 +65,25 @@ export default async function Home() {
     .orderBy(desc(sql`count(*)`))
     .limit(12);
 
-  const [lead, ...rest] = recent;
+  const writers = await db
+    .select({
+      handle: profiles.handle,
+      displayName: profiles.displayName,
+      bio: profiles.bio,
+      homeCountry: profiles.homeCountry,
+      stories: sql<number>`count(${stories.id})::int`.as("stories"),
+      countries: sql<string[]>`
+        array_remove(array_agg(distinct ${stories.countryCode}), null)
+      `.as("countries"),
+    })
+    .from(profiles)
+    .innerJoin(
+      stories,
+      sql`${stories.authorId} = ${profiles.userId} and ${stories.status} = 'published'`,
+    )
+    .groupBy(profiles.handle, profiles.displayName, profiles.bio, profiles.homeCountry)
+    .orderBy(desc(sql`count(${stories.id})`))
+    .limit(4);
 
   const cta = !viewer
     ? { href: "/signin", label: "Start writing" }
@@ -65,20 +91,34 @@ export default async function Home() {
       ? { href: "/write", label: "Write a story" }
       : { href: "/onboarding", label: "Finish your profile" };
 
+  // The page is built from modules that each do a different job, rather than
+  // one card repeated: a lead, a pair, a voice, more stories, the people,
+  // and an invitation.
+  const [lead, ...rest] = recent;
+  // Three across on a wide page; the grid collapses to two and then one.
+  const trio = rest.slice(0, 3);
+  const remainder = rest.slice(3);
+
+  const quoted = recent.find((s) => firstQuote(s.bodyJson));
+  const quote = quoted ? firstQuote(quoted.bodyJson) : null;
+
   return (
     <main className="flex-1">
       {/* ---------------------------------------------------------------- *
        * Hero
        * ---------------------------------------------------------------- */}
       <section className="relative isolate -mt-16 flex min-h-[80vh] items-end overflow-hidden sm:min-h-[86vh]">
-        <HeroPhoto className="absolute inset-0 -z-10 h-full w-full object-cover" />
-
-        {/* See .hero-veil / .hero-wash / .hero-foot in globals.css. */}
+        <HeroPhoto className="absolute inset-0 -z-10 h-full w-full" />
         <div aria-hidden className="hero-veil" />
         <div aria-hidden className="hero-wash" />
         <div aria-hidden className="hero-foot" />
+        <div aria-hidden className="hero-cap" />
 
-        <div className="mx-auto w-full max-w-3xl px-6 pb-16 pt-32 sm:pb-24">
+        {/* Clear of the nav and of the copy column -- it sits in the empty
+            sky on the right of the photograph. */}
+        <RotatingSeal className="absolute right-12 top-44 hidden size-44 text-foreground/65 xl:block 2xl:right-20 2xl:size-52" />
+
+        <div className="page hero-in pb-16 pt-32 sm:pb-24">
           <p className="eyebrow mb-4 text-foreground/60">
             Field notes from everywhere
           </p>
@@ -107,41 +147,108 @@ export default async function Home() {
         </div>
       </section>
 
-      {/* ---------------------------------------------------------------- *
-       * Destinations
-       * ---------------------------------------------------------------- */}
+      {/* ------------------------------------------------------------ *
+       * Destinations -- sand
+       * ------------------------------------------------------------ */}
       {destinations.length > 0 && (
-        <section className="mx-auto w-full max-w-3xl px-6 pb-4 pt-12">
-          <h2 className="eyebrow mb-4">Where people have been</h2>
-          <DestinationStrip destinations={destinations} />
+        <section className="band topo bg-tint-sand">
+          <div className="page py-10">
+            <Reveal>
+              <h2 className="eyebrow mb-4">Where people have been</h2>
+              <DestinationTicker destinations={destinations} />
+            </Reveal>
+          </div>
         </section>
       )}
 
-      {/* ---------------------------------------------------------------- *
-       * Stories
-       * ---------------------------------------------------------------- */}
-      <section id="latest" className="mx-auto w-full max-w-3xl px-6 pb-24 pt-10">
-        {recent.length === 0 ? (
+      {recent.length === 0 ? (
+        <div className="page py-16">
           <EmptyState title="Nothing published yet">
             The first story could be yours.
           </EmptyState>
-        ) : (
-          <>
+        </div>
+      ) : (
+        <>
+          {/* Stories sit on plain background -- the photographs supply the
+              colour here, and a tint behind them would fight. */}
+          <section id="latest" className="page pt-16">
             <div className="mb-8 flex items-baseline gap-4">
-              <h2 className="eyebrow">Latest</h2>
+              <span aria-hidden className="font-display numeral-outline text-4xl font-semibold leading-none">
+                01
+              </span>
+              <h2 className="eyebrow">The latest</h2>
               <span aria-hidden className="h-px flex-1 bg-rule" />
             </div>
+            <Reveal>
+              <StoryList stories={[lead]} featured />
+            </Reveal>
+          </section>
 
-            <StoryList stories={[lead]} featured />
+          {trio.length > 0 && (
+            <section className="page mt-16">
+              <Reveal>
+                <StoryPair stories={trio} />
+              </Reveal>
+            </section>
+          )}
 
-            {rest.length > 0 && (
-              <div className="mt-12 border-t border-rule">
-                <StoryList stories={rest} />
+          {/* ---------------------------------------------------------- *
+           * Pull quote -- sea
+           * ---------------------------------------------------------- */}
+          {quote && quoted && (
+            <section>
+              <div>
+                <Reveal>
+                <QuoteBreak
+                  quote={quote}
+                  title={quoted.title}
+                  href={`/@${quoted.handle}/${quoted.slug}`}
+                  authorName={quoted.displayName}
+                  authorHandle={quoted.handle}
+                />
+                </Reveal>
               </div>
-            )}
-          </>
-        )}
-      </section>
+            </section>
+          )}
+
+          {remainder.length > 0 && (
+            <section className="page pt-16">
+              <div className="mb-8 flex items-baseline gap-4">
+                <span aria-hidden className="font-display numeral-outline text-4xl font-semibold leading-none">
+                  02
+                </span>
+                <h2 className="eyebrow">More stories</h2>
+                <span aria-hidden className="h-px flex-1 bg-rule" />
+              </div>
+              <Reveal>
+                <StoryMosaic stories={remainder} />
+              </Reveal>
+            </section>
+          )}
+
+          {/* ---------------------------------------------------------- *
+           * Writers -- olive
+           * ---------------------------------------------------------- */}
+          <section className="band topo mt-20 bg-tint-olive">
+            <div className="page py-16">
+              <Reveal>
+                <WritersRow writers={writers} />
+              </Reveal>
+            </div>
+          </section>
+
+          {/* ---------------------------------------------------------- *
+           * Invitation -- clay
+           * ---------------------------------------------------------- */}
+          <section className="band topo bg-tint-clay">
+            <div className="page py-16">
+              <Reveal>
+                <WriteInvite href={cta.href} />
+              </Reveal>
+            </div>
+          </section>
+        </>
+      )}
     </main>
   );
 }

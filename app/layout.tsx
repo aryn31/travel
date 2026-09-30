@@ -38,10 +38,25 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
+      // The theme script writes data-theme before React hydrates, so the
+      // server markup and the client will differ on this one attribute.
+      suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} ${fraunces.variable} h-full antialiased`}
     >
       {/* pt-16 clears the fixed header on every page; the home hero cancels
           it with -mt-16 so the landscape runs behind the header. */}
+      <head>
+        {/*
+          Runs before first paint. Without it the page renders light, then
+          snaps to dark once React mounts -- the flash every hand-rolled
+          theme switcher starts with. Inline and synchronous on purpose.
+        */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem('theme');var d=t==='dark'||((!t||t==='system')&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=d?'dark':'light';document.documentElement.classList.add('js');}catch(e){document.documentElement.dataset.theme='light';}})();`,
+          }}
+        />
+      </head>
       <body className="min-h-full flex flex-col pt-16">
         {/* First tab stop: lets keyboard users jump the nav on every page. */}
         <a
