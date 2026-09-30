@@ -8,6 +8,8 @@ export type Viewer = {
   userId: string;
   email: string;
   role: "user" | "editor" | "admin";
+  /** Whether a password is set. The hash itself never leaves this module. */
+  hasPassword: boolean;
   profile: Profile | null;
 };
 
@@ -30,6 +32,7 @@ export async function getViewer(): Promise<Viewer | null> {
     userId: row.user.id,
     email: row.user.email ?? "",
     role: row.user.role,
+    hasPassword: Boolean(row.user.passwordHash),
     profile: row.profile,
   };
 }

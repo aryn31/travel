@@ -189,16 +189,51 @@ Reading page typography, author byline card, reading time, share + OG image via
 stories and an `is_featured` flag you control. ISR with on-publish
 revalidation. Done when: a story link pasted into WhatsApp looks intentional.
 
-**Week 4 — discovery and interaction**
+**Week 4 — discovery and interaction** (search + filter done)
 Tag pages, country filter, Postgres FTS search page, likes (optimistic),
 threaded-one-level comments with rate limiting. Done when: a stranger can find
 a story without a direct link.
+
+*As built (`/stories`):* one page covering the archive, search, country filter,
+sort and pagination. Search covers the story **and its author**: a generated
+column can only read its own row, so `profiles` carries its own
+`search_vector` (display name + handle, name only -- a bio mentioning plantain
+should not drag every story that person wrote into the results for
+"plantain") with its own GIN index, and the query matches either side,
+ranking the author half at 0.4 so a story actually about the word still wins.
+`place_name` was added to the story vector at weight A alongside the title — the first thing anyone types on a travel site is
+a place, and "Kotor" was in the place field but nowhere in the prose. Dropping
+and re-adding a generated column silently takes its index with it, and
+drizzle-kit does not re-emit the `CREATE INDEX` because the index definition
+never changed; migration `0004` adds it back by hand. The match is FTS *or* a
+substring match on title, place, display name and handle: `to_tsquery` only
+matches whole lexemes, so "Napl" found nothing -- and "Seok-jin Park" indexes
+as three lexemes, so the handle "seokjin" matched none of them. Snippets come from
+`ts_headline` with control-character delimiters, split and rendered as
+elements, so the highlight is the same match that produced the ranking and no
+HTML is ever interpolated. The form is a plain GET — every search is a
+shareable URL and it works with no JavaScript at all. Tags, likes and comments
+still outstanding.
 
 **Week 5 — hardening (local)**
 Reports flow + admin list + soft delete, Lighthouse pass against a production
 build (`npm run build && npm start`, not dev mode — dev numbers are
 meaningless), seed 15–20 stories of your own so every list, search result, and
 empty state is exercised with real content rather than lorem ipsum.
+
+*Auth as built:* email + password, with the magic link kept as the second
+way in -- which matters because with no mail provider configured the link is
+the only account recovery that exists. Passwords are scrypt (N=2^15) from
+`node:crypto`, stored as a self-describing `scrypt$N$r$p$salt$key` string, so
+the cost parameters can be raised later without invalidating anything.
+Auth.js v5's Credentials provider only supports JWT sessions, and this app
+wants **database** sessions (a row that can be deleted is what makes
+revocation possible), so `lib/auth-session.ts` writes the session row and the
+`authjs.session-token` cookie itself; a session made that way is
+indistinguishable from one the magic link created. `lib/throttle.ts` locks an
+address after 8 failed attempts -- in-memory, which is correct for one
+process and wrong the moment there are two (see 10). Changing a password
+revokes every other session but keeps the current one.
 
 **Deferred until you choose to deploy:** real email delivery, Google OAuth,
 terms / privacy / content policy, Sentry, analytics, opening signups.

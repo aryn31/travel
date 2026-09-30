@@ -9,8 +9,10 @@ import { slugify } from "../lib/slug";
 import { landscapePng, type Palette } from "./photo";
 import { AUTHORS, type SeedBlock } from "./seed-stories";
 import { findPhoto } from "./commons";
+import { SEED_DOMAIN, SEED_PASSWORD } from "./seed-config";
+import { hashPassword } from "../lib/password";
 
-const SEED_DOMAIN = "@seed.local";
+
 
 function palette(hue: number, variant: number): Palette {
   const h = (hue + variant * 17) % 360;
@@ -224,10 +226,18 @@ async function main() {
   let photoCount = 0;
   let realCount = 0;
 
+  // Hashed once, not per account: scrypt is deliberately slow, and six
+  // identical passwords do not need six derivations.
+  const seedPasswordHash = await hashPassword(SEED_PASSWORD);
+
   for (const author of AUTHORS) {
     const [user] = await db
       .insert(users)
-      .values({ email: author.email, emailVerified: new Date() })
+      .values({
+        email: author.email,
+        emailVerified: new Date(),
+        passwordHash: seedPasswordHash,
+      })
       .returning({ id: users.id });
 
     await db.insert(profiles).values({
@@ -349,7 +359,7 @@ async function main() {
     `\n${AUTHORS.length} accounts · ${storyCount} stories · ${photoCount} photos ` +
       `(${realCount} real from Commons, ${photoCount - realCount} generated)`,
   );
-  console.log("\nSign in as any of them at /signin (link prints to this terminal):");
+  console.log(`\nSign in as any of them at /signin with password: ${SEED_PASSWORD}`);
   for (const a of AUTHORS) console.log(`  ${a.email}`);
 }
 

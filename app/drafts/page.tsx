@@ -37,7 +37,12 @@ export default async function DraftsPage() {
             {drafts.length === 1 ? "draft" : "drafts"}
           </p>
         </div>
-        <ButtonLink href="/write">New story</ButtonLink>
+        <div className="flex flex-wrap items-center gap-2">
+          <ButtonLink href="/settings" variant="secondary">
+            Edit profile
+          </ButtonLink>
+          <ButtonLink href="/write">New story</ButtonLink>
+        </div>
       </div>
 
       {rows.length === 0 ? (

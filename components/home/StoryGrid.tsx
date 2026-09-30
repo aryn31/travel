@@ -31,7 +31,7 @@ function Meta({ story }: { story: StoryCard }) {
  */
 /* One hue per card, by position, so the row reads as a set rather than three
    copies. Border, rule and number all take the same colour. */
-const CARD_HUES = [
+export const CARD_HUES = [
   { border: "border-accent/45", bar: "bg-accent", text: "text-accent", glow: "hover:shadow-[0_18px_40px_-20px_var(--accent)]" },
   { border: "border-sea/45", bar: "bg-sea", text: "text-sea", glow: "hover:shadow-[0_18px_40px_-20px_var(--sea)]" },
   { border: "border-indigo/45", bar: "bg-indigo", text: "text-indigo", glow: "hover:shadow-[0_18px_40px_-20px_var(--indigo)]" },

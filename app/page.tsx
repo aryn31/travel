@@ -230,7 +230,7 @@ export default async function Home() {
            * Writers -- olive
            * ---------------------------------------------------------- */}
           <section className="band topo mt-20 bg-tint-olive">
-            <div className="page py-16">
+            <div className="page py-20">
               <Reveal>
                 <WritersRow writers={writers} />
               </Reveal>
@@ -241,7 +241,7 @@ export default async function Home() {
            * Invitation -- clay
            * ---------------------------------------------------------- */}
           <section className="band topo bg-tint-clay">
-            <div className="page py-16">
+            <div className="page py-24">
               <Reveal>
                 <WriteInvite href={cta.href} />
               </Reveal>

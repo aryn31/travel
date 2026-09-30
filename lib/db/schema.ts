@@ -27,6 +27,12 @@ export const users = pgTable("users", {
   email: text("email").unique(),
   emailVerified: timestamp("email_verified", { mode: "date" }),
   image: text("image"),
+
+  // Null for accounts that have only ever signed in by magic link. Both
+  // routes stay open: a password is something you add, not something the
+  // account is required to have.
+  passwordHash: text("password_hash"),
+
   role: text("role", { enum: ["user", "editor", "admin"] })
     .notNull()
     .default("user"),
@@ -75,6 +81,11 @@ export const verificationTokens = pgTable(
  * Application tables.
  * ------------------------------------------------------------------ */
 
+/** Postgres full-text search vector. Drizzle has no built-in tsvector type. */
+const tsvector = customType<{ data: string }>({
+  dataType: () => "tsvector",
+});
+
 export const profiles = pgTable(
   "profiles",
   {
@@ -87,20 +98,31 @@ export const profiles = pgTable(
     bio: text("bio"),
     website: text("website"),
     homeCountry: text("home_country"),
+
+    // Searching a writer's name has to find their stories, and a generated
+    // column can only read its own row -- so the author side of the index
+    // lives here and the story query matches against both.
+    //
+    // Name only, not bio: a bio that mentions plantain should not put every
+    // story that person wrote into the results for "plantain". The handle
+    // uses 'simple' because it is an identifier, not English -- the stemmer
+    // would turn a handle like "travels" into "travel".
+    searchVector: tsvector("search_vector").generatedAlwaysAs(
+      sql`setweight(to_tsvector('english', coalesce(display_name, '')), 'A') || setweight(to_tsvector('simple', coalesce(handle, '')), 'A')`,
+    ),
+
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },
-  // Case-insensitive uniqueness: "Aryan" and "aryan" must not both exist,
-  // because the handle is the first path segment of every story URL.
-  (t) => [uniqueIndex("profiles_handle_lower_idx").on(sql`lower(${t.handle})`)],
+  (t) => [
+    // Case-insensitive uniqueness: "Aryan" and "aryan" must not both exist,
+    // because the handle is the first path segment of every story URL.
+    uniqueIndex("profiles_handle_lower_idx").on(sql`lower(${t.handle})`),
+    index("profiles_search_idx").using("gin", t.searchVector),
+  ],
 );
 
 export type Profile = typeof profiles.$inferSelect;
-
-/** Postgres full-text search vector. Drizzle has no built-in tsvector type. */
-const tsvector = customType<{ data: string }>({
-  dataType: () => "tsvector",
-});
 
 export const storyStatus = pgEnum("story_status", [
   "draft",
@@ -180,8 +202,11 @@ export const stories = pgTable(
     lat: doublePrecision("lat"),
     lng: doublePrecision("lng"),
 
+    // Place carries the same weight as the title: on a travel site the
+    // first thing anyone types is where they want to read about, and
+    // "Kotor" is often in the place field but nowhere in the prose.
     searchVector: tsvector("search_vector").generatedAlwaysAs(
-      sql`setweight(to_tsvector('english', coalesce(title, '')), 'A') || setweight(to_tsvector('english', coalesce(body_text, '')), 'B')`,
+      sql`setweight(to_tsvector('english', coalesce(title, '')), 'A') || setweight(to_tsvector('english', coalesce(place_name, '')), 'A') || setweight(to_tsvector('english', coalesce(body_text, '')), 'B')`,
     ),
 
     createdAt: timestamp("created_at").notNull().defaultNow(),

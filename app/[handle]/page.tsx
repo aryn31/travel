@@ -97,9 +97,14 @@ export default async function ProfilePage({ params }: PageProps<"/[handle]">) {
               </div>
             </div>
             {isMe && (
-              <ButtonLink href="/drafts" variant="secondary" size="sm">
-                Your stories
-              </ButtonLink>
+              <div className="flex flex-wrap items-center gap-2">
+                <ButtonLink href="/settings" variant="secondary" size="sm">
+                  Edit profile
+                </ButtonLink>
+                <ButtonLink href="/drafts" variant="secondary" size="sm">
+                  Your stories
+                </ButtonLink>
+              </div>
             )}
           </div>
 
@@ -117,6 +122,23 @@ export default async function ProfilePage({ params }: PageProps<"/[handle]">) {
               <div className="flex gap-1.5">
                 <dt className="sr-only">Based in</dt>
                 <dd>Based in {profile.homeCountry}</dd>
+              </div>
+            )}
+            {profile.website && (
+              <div className="flex min-w-0 gap-1.5">
+                <dt className="sr-only">Website</dt>
+                <dd className="min-w-0">
+                  <a
+                    href={profile.website}
+                    // User-supplied link on a public page: same policy the
+                    // story renderer applies to links in prose.
+                    rel="noopener noreferrer nofollow ugc"
+                    target="_blank"
+                    className="block truncate text-accent underline underline-offset-2"
+                  >
+                    {profile.website.replace(/^https?:\/\//, "").replace(/\/$/, "")}
+                  </a>
+                </dd>
               </div>
             )}
             <div className="flex gap-1.5">

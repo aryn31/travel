@@ -11,10 +11,25 @@ const TINTS = [
   "bg-[#96552f] text-white",
 ];
 
+/*
+ * FNV-1a with an avalanche step on the end. The plain `hash * 31 + c` this
+ * replaced put four of the five seeded handles on the same tint: 31 is
+ * congruent to 1 mod 6, so the bucket collapsed to a sum of character codes.
+ * Raw FNV is no better here -- its low bits are only a parity of the input,
+ * and mod 6 samples exactly those -- so the result is mixed before use.
+ */
 function tintFor(seed: string) {
-  let hash = 0;
-  for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) | 0;
-  return TINTS[Math.abs(hash) % TINTS.length];
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < seed.length; i++) {
+    hash ^= seed.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  hash ^= hash >>> 16;
+  hash = Math.imul(hash, 0x21f0aaad);
+  hash ^= hash >>> 15;
+  hash = Math.imul(hash, 0x735a2d97);
+  hash ^= hash >>> 15;
+  return TINTS[(hash >>> 0) % TINTS.length];
 }
 
 function initials(name: string) {
