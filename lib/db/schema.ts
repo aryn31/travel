@@ -127,6 +127,15 @@ export const media = pgTable("media", {
   bytes: integer("bytes").notNull(),
   blurhash: text("blurhash"),
   alt: text("alt"),
+
+  // Provenance for images that didn't originate here. Stored even when not
+  // displayed: a CC BY-SA photo needs visible credit before it goes public,
+  // and losing the attribution makes that impossible to do later.
+  credit: text("credit"),
+  creditUrl: text("credit_url"),
+  license: text("license"),
+  sourceUrl: text("source_url"),
+
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

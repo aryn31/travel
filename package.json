@@ -11,7 +11,8 @@
     "seed:wipe": "tsx --env-file=.env.local scripts/seed.ts --wipe",
     "db:migrate": "drizzle-kit migrate",
     "db:generate": "drizzle-kit generate",
-    "check:media": "tsx --env-file=.env.local scripts/check-media.ts"
+    "check:media": "tsx --env-file=.env.local scripts/check-media.ts",
+    "photo": "tsx --env-file=.env.local scripts/photo-preview.ts"
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.11.3",

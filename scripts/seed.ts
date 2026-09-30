@@ -7,8 +7,8 @@ import { put, publicUrl } from "../lib/storage";
 import { docToSummary, docToText, readingMinutes, type Node } from "../lib/story-doc";
 import { slugify } from "../lib/slug";
 import { landscapePng, type Palette } from "./photo";
-import { AUTHORS, type SeedBlock } from "./seed-content";
-import { TRIP_STORIES } from "./seed-trips";
+import { AUTHORS, type SeedBlock } from "./seed-stories";
+import { findPhoto } from "./commons";
 
 const SEED_DOMAIN = "@seed.local";
 
@@ -37,23 +37,66 @@ function palette(hue: number, variant: number): Palette {
   };
 }
 
-/** Upload a generated photo the same way the app would, so the seed exercises
- *  the real storage path rather than inventing its own. */
+/**
+ * Stores a photo through the same path the app uses, so the seed exercises
+ * the real storage layer rather than inventing its own.
+ *
+ * Prefers a real photograph of the place from Wikimedia Commons; falls back
+ * to a generated landscape when a search returns nothing, so seeding still
+ * works offline.
+ */
 async function addPhoto(
   ownerId: string,
   storyId: string,
-  seed: number,
-  hue: number,
-  variant: number,
-  alt: string,
-  portrait = false,
+  opts: {
+    query: string;
+    alt: string;
+    seed: number;
+    hue: number;
+    variant: number;
+    landscape?: boolean;
+    used: Set<string>;
+  },
 ) {
-  const width = portrait ? 1200 : 1800;
-  const height = portrait ? 1600 : 1150;
-  const bytes = landscapePng(width, height, seed, palette(hue, variant));
-  const key = `${ownerId}/${crypto.randomUUID()}.png`;
+  const found = await findPhoto(opts.query, {
+    landscape: opts.landscape ?? true,
+    skip: opts.used,
+  });
 
+  let bytes: Buffer;
+  let width: number;
+  let height: number;
+  let ext: string;
+  let mime: string;
+  let credit: string | null = null;
+  let creditUrl: string | null = null;
+  let license: string | null = null;
+  let sourceUrl: string | null = null;
+
+  if (found) {
+    opts.used.add(found.title);
+    console.log(`      ${found.title.replace(/^File:/, "").slice(0, 68)}`);
+    bytes = found.buffer;
+    width = found.width;
+    height = found.height;
+    mime = found.mime;
+    ext = found.mime === "image/png" ? "png" : "jpg";
+    credit = found.credit;
+    creditUrl = found.creditUrl;
+    license = found.license;
+    sourceUrl = found.sourceUrl;
+  } else {
+    console.log(`      (generated) no Commons match for "${opts.query}"`);
+    width = opts.landscape === false ? 1200 : 1800;
+    height = opts.landscape === false ? 1600 : 1150;
+    bytes = landscapePng(width, height, opts.seed, palette(opts.hue, opts.variant));
+    mime = "image/png";
+    ext = "png";
+  }
+
+  const key = `${ownerId}/${crypto.randomUUID()}.${ext}`;
   await put(key, bytes);
+
   const [row] = await db
     .insert(media)
     .values({
@@ -62,13 +105,17 @@ async function addPhoto(
       storageKey: key,
       width,
       height,
-      mime: "image/png",
+      mime,
       bytes: bytes.byteLength,
-      alt,
+      alt: opts.alt,
+      credit,
+      creditUrl,
+      license,
+      sourceUrl,
     })
     .returning({ id: media.id });
 
-  return { id: row.id, url: publicUrl(key), width, height };
+  return { id: row.id, url: publicUrl(key), width, height, real: Boolean(found) };
 }
 
 function textNode(text: string): Node {
@@ -81,9 +128,11 @@ async function buildDoc(
   storyId: string,
   hue: number,
   seedBase: number,
-): Promise<{ doc: { type: "doc"; content: Node[] }; images: number }> {
+  used: Set<string>,
+): Promise<{ doc: { type: "doc"; content: Node[] }; images: number; real: number }> {
   const content: Node[] = [];
   let images = 0;
+  let real = 0;
 
   for (const block of blocks) {
     switch (block.t) {
@@ -113,15 +162,17 @@ async function buildDoc(
         });
         break;
       case "img": {
-        const photo = await addPhoto(
-          ownerId,
-          storyId,
-          seedBase + images * 977,
+        const photo = await addPhoto(ownerId, storyId, {
+          query: block.query,
+          alt: block.alt,
+          seed: seedBase + images * 977,
           hue,
-          images + 1,
-          block.alt,
-          images % 3 === 2,
-        );
+          variant: images + 1,
+          // Every third image portrait, for rhythm down a long story.
+          landscape: images % 3 !== 2,
+          used,
+        });
+        if (photo.real) real++;
         content.push({
           type: "image",
           attrs: {
@@ -137,7 +188,7 @@ async function buildDoc(
     }
   }
 
-  return { doc: { type: "doc", content }, images };
+  return { doc: { type: "doc", content }, images, real };
 }
 
 async function main() {
@@ -171,6 +222,7 @@ async function main() {
 
   let storyCount = 0;
   let photoCount = 0;
+  let realCount = 0;
 
   for (const author of AUTHORS) {
     const [user] = await db
@@ -186,10 +238,11 @@ async function main() {
       homeCountry: author.home,
     });
 
-    // Short vignettes plus the long trip narratives for this author.
-    const authored = [...author.stories, ...(TRIP_STORIES[author.handle] ?? [])];
+    // A hue per author, only used by the fallback generator when Commons
+    // has nothing for a place.
+    const hue = (author.handle.charCodeAt(0) * 37) % 360;
 
-    for (const [i, story] of authored.entries()) {
+    for (const [i, story] of author.stories.entries()) {
       const id = crypto.randomUUID();
       const published = story.daysAgo !== null;
       const publishedAt = published
@@ -210,18 +263,31 @@ async function main() {
         updatedAt: publishedAt ?? new Date(),
       });
 
-      const { doc, images } = await buildDoc(
+      // One story should not show the same photograph twice.
+      const used = new Set<string>();
+
+      const cover = published
+        ? await addPhoto(user.id, id, {
+            query: story.coverQuery,
+            alt: "",
+            seed: 500 + i * 3313,
+            hue,
+            variant: 0,
+            landscape: true,
+            used,
+          })
+        : null;
+
+      const { doc, images, real } = await buildDoc(
         story.blocks,
         user.id,
         id,
-        author.hue,
+        hue,
         1000 + author.handle.length * 31 + i * 7919,
+        used,
       );
 
       const text = docToText(doc);
-      const cover = published
-        ? await addPhoto(user.id, id, 500 + i * 3313, author.hue, 0, "")
-        : null;
 
       await db
         .update(stories)
@@ -236,9 +302,10 @@ async function main() {
 
       storyCount++;
       photoCount += images + (cover ? 1 : 0);
+      realCount += real + (cover?.real ? 1 : 0);
     }
 
-    console.log(`  @${author.handle.padEnd(9)} ${authored.length} stories`);
+    console.log(`  @${author.handle.padEnd(9)} ${author.stories.length} stories`);
   }
 
   // Any media row whose file is missing gets a regenerated placeholder at the
@@ -278,7 +345,10 @@ async function main() {
     }
   }
 
-  console.log(`\n${AUTHORS.length} accounts · ${storyCount} stories · ${photoCount} photos`);
+  console.log(
+    `\n${AUTHORS.length} accounts · ${storyCount} stories · ${photoCount} photos ` +
+      `(${realCount} real from Commons, ${photoCount - realCount} generated)`,
+  );
   console.log("\nSign in as any of them at /signin (link prints to this terminal):");
   for (const a of AUTHORS) console.log(`  ${a.email}`);
 }
