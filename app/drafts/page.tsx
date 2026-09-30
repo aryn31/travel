@@ -120,6 +120,7 @@ function StoryRow({
   editHref?: string;
   story: {
     title: string;
+    excerpt: string;
     bodyText: string;
     readingMinutes: number;
     updatedAt: Date;
@@ -150,7 +151,7 @@ function StoryRow({
           {story.title.trim() || "Untitled"}
         </span>
         <span className="mt-0.5 block truncate text-sm text-muted">
-          {excerpt(story.bodyText, 90) || "Empty"}
+          {excerpt(story.excerpt || story.bodyText, 90) || "Empty"}
         </span>
         <span className="mt-1 block text-xs text-faint">
           {story.readingMinutes > 0 && `${story.readingMinutes} min · `}

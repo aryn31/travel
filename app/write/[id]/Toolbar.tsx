@@ -45,6 +45,10 @@ export function Toolbar({
   uploading: boolean;
   words: number;
 }) {
+  // Alt text belongs to the selected image, so the control only exists while
+  // one is selected. Captions come from the same attribute on the reading page.
+  const imageSelected = editor.isActive("image");
+
   function setLink() {
     const previous = editor.getAttributes("link").href as string | undefined;
     const input = window.prompt("Link URL (https://…)", previous ?? "https://");
@@ -139,7 +143,28 @@ export function Toolbar({
         {uploading ? "Uploading…" : "Image"}
       </Button>
 
-      {words > 0 && (
+      {imageSelected && (
+        <>
+          <Divider />
+          <label className="flex min-w-0 flex-1 items-center gap-2">
+            <span className="shrink-0 text-xs text-muted">Alt text</span>
+            <input
+              value={(editor.getAttributes("image").alt as string) ?? ""}
+              onChange={(e) =>
+                editor
+                  .chain()
+                  .focus()
+                  .updateAttributes("image", { alt: e.target.value })
+                  .run()
+              }
+              placeholder="Describe this photo"
+              className="min-w-0 flex-1 rounded-md border border-rule bg-transparent px-2 py-1 text-sm outline-none placeholder:text-faint focus:border-foreground/40"
+            />
+          </label>
+        </>
+      )}
+
+      {!imageSelected && words > 0 && (
         <span className="ml-auto hidden text-xs tabular-nums text-faint sm:block">
           {words.toLocaleString()} {words === 1 ? "word" : "words"}
         </span>

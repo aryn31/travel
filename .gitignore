@@ -43,3 +43,6 @@ next-env.d.ts
 # local dev
 .env.local
 /storage/
+
+# seed data
+/scripts/tmp-*

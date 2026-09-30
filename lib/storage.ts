@@ -1,5 +1,5 @@
 import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 /**
@@ -103,6 +103,14 @@ export async function get(key: string): Promise<Buffer | null> {
   } catch {
     return null;
   }
+}
+
+export async function remove(key: string): Promise<void> {
+  if (!isSafeKey(key)) return;
+  const target = path.join(ROOT, key);
+  if (!target.startsWith(ROOT + path.sep)) return;
+  // force: a missing file is the desired end state either way.
+  await rm(target, { force: true });
 }
 
 /** Where the browser fetches the bytes from. Becomes the R2 custom domain later. */

@@ -8,7 +8,8 @@ import { media, profiles, stories } from "@/lib/db/schema";
 import type { Story } from "@/lib/db/schema";
 import { getViewer } from "@/lib/session";
 import { slugForTitle } from "@/lib/stories";
-import { docToText, isDoc, readingMinutes } from "@/lib/story-doc";
+import { docToSummary, docToText, isDoc, readingMinutes } from "@/lib/story-doc";
+import { remove as removeFromStorage } from "@/lib/storage";
 
 /**
  * Every mutation goes through this. Ownership is checked against the session
@@ -46,6 +47,10 @@ export async function createDraft() {
   redirect(`/write/${id}`);
 }
 
+// A story is prose, not a payload. Without a ceiling, one request could park
+// an arbitrarily large document in the database.
+const MAX_DOC_BYTES = 1_000_000;
+
 export type SaveResult = { ok: true; savedAt: number } | { ok: false; error: string };
 
 export async function saveStory(
@@ -58,6 +63,14 @@ export async function saveStory(
   // The document arrives from the browser, so it gets shape-checked before it
   // becomes the stored source of truth.
   if (!isDoc(doc)) return { ok: false, error: "Could not save — bad document." };
+
+  const size = JSON.stringify(doc).length;
+  if (size > MAX_DOC_BYTES) {
+    return {
+      ok: false,
+      error: "This story is too long to save. Try splitting it in two.",
+    };
+  }
 
   const cleanTitle = title.slice(0, 200);
   const text = docToText(doc);
@@ -76,6 +89,7 @@ export async function saveStory(
       slug,
       bodyJson: doc,
       bodyText: text,
+      excerpt: docToSummary(doc),
       readingMinutes: readingMinutes(text),
       updatedAt: new Date(),
     })
@@ -136,7 +150,20 @@ export async function unpublishStory(storyId: string) {
 
 export async function deleteStory(storyId: string) {
   const story = await requireOwnStory(storyId);
+
+  // Read the keys before the delete: the media rows go with the story, and
+  // without them the files would be unreachable and permanent.
+  const owned = await db
+    .select({ storageKey: media.storageKey })
+    .from(media)
+    .where(eq(media.storyId, story.id));
+
   await db.delete(stories).where(eq(stories.id, story.id));
+  await db.delete(media).where(eq(media.storyId, story.id));
+
+  // Storage last. A failure here leaks a file, which is recoverable; failing
+  // before the database delete would leave a story pointing at nothing.
+  await Promise.allSettled(owned.map((m) => removeFromStorage(m.storageKey)));
 
   await revalidateStory(story.authorId, story.slug);
   revalidatePath("/");

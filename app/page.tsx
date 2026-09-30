@@ -16,6 +16,7 @@ export default async function Home() {
       id: stories.id,
       slug: stories.slug,
       title: stories.title,
+      excerpt: stories.excerpt,
       bodyText: stories.bodyText,
       readingMinutes: stories.readingMinutes,
       publishedAt: stories.publishedAt,

@@ -73,8 +73,6 @@ export async function finalizeUpload(input: {
     return { ok: false, error: "Bad image dimensions." };
   }
 
-  // Cap per story rather than per account: the limit exists to keep one
-  // story's page weight sane (PLAN.md 4.3).
   const [story] = await db
     .select({ id: stories.id })
     .from(stories)
@@ -84,18 +82,24 @@ export async function finalizeUpload(input: {
     .limit(1);
   if (!story) return { ok: false, error: "Story not found." };
 
+  // Per story, not per account: the limit exists to keep one story's page
+  // weight sane (PLAN.md 4.3).
   const [{ used }] = await db
     .select({ used: count() })
     .from(media)
-    .where(eq(media.ownerId, viewer.userId));
-  if (used >= MAX_IMAGES_PER_STORY * 50) {
-    return { ok: false, error: "Upload limit reached." };
+    .where(eq(media.storyId, story.id));
+  if (used >= MAX_IMAGES_PER_STORY) {
+    return {
+      ok: false,
+      error: `That's ${MAX_IMAGES_PER_STORY} images — the limit for one story.`,
+    };
   }
 
   const id = crypto.randomUUID();
   await db.insert(media).values({
     id,
     ownerId: viewer.userId,
+    storyId: story.id,
     storageKey: input.key,
     width: input.width,
     height: input.height,

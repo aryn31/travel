@@ -115,6 +115,9 @@ export const media = pgTable("media", {
   ownerId: text("owner_id")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
+  // Which story the upload belongs to. Needed to enforce the per-story cap
+  // and to know what to delete from storage when a story goes.
+  storyId: text("story_id"),
   storageKey: text("storage_key").notNull(),
   // Stored at upload time so the reading page can reserve space before the
   // image loads -- no layout shift on a photo-heavy story.
@@ -145,6 +148,10 @@ export const stories = pgTable(
     // instead would mean sanitising forever -- see PLAN.md 4.2.
     bodyJson: jsonb("body_json").notNull().default({ type: "doc", content: [] }),
     bodyText: text("body_text").notNull().default(""),
+
+    // Prose only -- headings excluded. body_text runs them together, which
+    // produced excerpts like "...into water. The bay Everything in Kotor".
+    excerpt: text("excerpt").notNull().default(""),
 
     coverMediaId: text("cover_media_id").references(() => media.id, {
       onDelete: "set null",

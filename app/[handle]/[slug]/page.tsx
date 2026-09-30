@@ -40,7 +40,7 @@ export async function generateMetadata({
   const isPublic = row.story.status === "published";
   return {
     title: row.story.title || "Untitled",
-    description: excerpt(row.story.bodyText, 160),
+    description: excerpt(row.story.excerpt || row.story.bodyText, 160),
     openGraph: row.cover
       ? { images: [{ url: publicUrl(row.cover.storageKey) }] }
       : undefined,

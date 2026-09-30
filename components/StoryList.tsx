@@ -5,6 +5,7 @@ export type StoryCard = {
   id: string;
   slug: string;
   title: string;
+  excerpt: string;
   bodyText: string;
   readingMinutes: number;
   publishedAt: Date | null;
@@ -70,7 +71,7 @@ function Featured({ story, showAuthor }: { story: StoryCard; showAuthor: boolean
           {story.title || "Untitled"}
         </h3>
         <p className="mt-3 line-clamp-3 text-lg leading-relaxed text-muted">
-          {excerpt(story.bodyText, 240)}
+          {excerpt(story.excerpt || story.bodyText, 240)}
         </p>
       </Link>
       <div className="mt-4">
@@ -90,7 +91,7 @@ function Row({ story, showAuthor }: { story: StoryCard; showAuthor: boolean }) {
               {story.title || "Untitled"}
             </h3>
             <p className="mt-1.5 line-clamp-2 leading-relaxed text-muted">
-              {excerpt(story.bodyText, 180)}
+              {excerpt(story.excerpt || story.bodyText, 180)}
             </p>
           </Link>
           <div className="mt-3">

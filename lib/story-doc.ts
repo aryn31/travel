@@ -84,6 +84,35 @@ export function docToText(doc: unknown): string {
   return lines.join("\n");
 }
 
+/**
+ * Prose only -- headings are skipped. docToText joins every block with a
+ * newline, and excerpt() collapses whitespace, so a heading ran straight into
+ * the next sentence: "...into water. The bay Everything in Kotor is...".
+ */
+export function docToSummary(doc: unknown): string {
+  if (!isDoc(doc)) return "";
+
+  const lines: string[] = [];
+  const walk = (node: Node) => {
+    if (node.type === "heading") return;
+
+    if (node.type === "paragraph" || node.type === "blockquote" || node.type === "listItem") {
+      const text = collectText(node).trim();
+      if (text) lines.push(text);
+      return;
+    }
+    for (const child of node.content ?? []) walk(child);
+  };
+  for (const node of doc.content) walk(node);
+  return lines.join(" ");
+}
+
+function collectText(node: Node): string {
+  if (node.type === "text") return node.text ?? "";
+  if (node.type === "image") return "";
+  return (node.content ?? []).map(collectText).join("");
+}
+
 export function readingMinutes(text: string): number {
   const words = text.trim().split(/\s+/).filter(Boolean).length;
   if (words === 0) return 0;

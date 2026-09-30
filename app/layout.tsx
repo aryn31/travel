@@ -15,6 +15,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  // Without this, Open Graph image URLs stay relative and every social
+  // scraper drops them -- shared links render with no image at all.
+  metadataBase: new URL(process.env.AUTH_URL ?? "http://localhost:3000"),
   title: { default: "Travel Stories", template: "%s · Travel Stories" },
   description: "Long-form travel stories, told properly.",
 };

@@ -52,6 +52,7 @@ export default async function ProfilePage({ params }: PageProps<"/[handle]">) {
       id: stories.id,
       slug: stories.slug,
       title: stories.title,
+      excerpt: stories.excerpt,
       bodyText: stories.bodyText,
       readingMinutes: stories.readingMinutes,
       publishedAt: stories.publishedAt,
