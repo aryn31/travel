@@ -7,7 +7,7 @@ import { put, publicUrl } from "../lib/storage";
 import { docToSummary, docToText, readingMinutes, type Node } from "../lib/story-doc";
 import { slugify } from "../lib/slug";
 import { landscapePng, type Palette } from "./photo";
-import { AUTHORS, type SeedBlock, type SeedStory } from "./seed-content";
+import { AUTHORS, type SeedBlock } from "./seed-content";
 
 const SEED_DOMAIN = "@seed.local";
 
