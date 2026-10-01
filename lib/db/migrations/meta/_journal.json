@@ -50,6 +50,13 @@
       "when": 1790780775873,
       "tag": "0006_smiling_red_wolf",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1790780775874,
+      "tag": "0007_lock_out_postgrest",
+      "breakpoints": true
     }
   ]
 }
