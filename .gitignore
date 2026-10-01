@@ -50,3 +50,8 @@ next-env.d.ts
 # source photo (optimised copies live in public/hero)
 /sunny-day.jpg
 /beachhero.jpg
+
+# Database dumps. They contain every user row -- password hashes and live
+# session tokens included -- so they must never be committed.
+*.dump
+*.sql.gz

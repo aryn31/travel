@@ -1,6 +1,10 @@
 import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { isSafeKey, publicUrl } from "./media-url";
+
+// Re-exported so callers have one storage import, as before.
+export { isSafeKey, publicUrl };
 
 /**
  * The seam between the app and wherever bytes actually live (PLAN.md 4.5).
@@ -30,11 +34,6 @@ function secret(): string {
   return value;
 }
 
-/** Keys are user-supplied on the way back in, so they get validated, not trusted. */
-export function isSafeKey(key: string): boolean {
-  return /^[A-Za-z0-9][A-Za-z0-9_-]*\/[A-Za-z0-9_-]+\.[a-z]{3,4}$/.test(key);
-}
-
 export function newKey(ownerId: string, mime: string): string {
   const ext = ALLOWED_MIME[mime];
   if (!ext) throw new Error(`Unsupported type: ${mime}`);
@@ -61,7 +60,7 @@ export type UploadTarget = { url: string; key: string; expires: number };
  * endpoint safe to expose: without it, any signed-in user could write to any
  * key. R2 gives you this property for free; here we do it ourselves.
  */
-export function createUploadUrl(key: string): UploadTarget {
+function localUploadUrl(key: string): UploadTarget {
   const expires = Date.now() + UPLOAD_TTL_MS;
   const sig = sign(key, expires);
   const url = `/api/upload?key=${encodeURIComponent(key)}&expires=${expires}&sig=${sig}`;
@@ -83,7 +82,7 @@ export function verifyUploadUrl(
   return { ok: true };
 }
 
-export async function put(key: string, body: Buffer): Promise<void> {
+async function localPut(key: string, body: Buffer): Promise<void> {
   if (!isSafeKey(key)) throw new Error("Bad key");
   const target = path.join(ROOT, key);
   // Belt and braces: even with isSafeKey, never write outside the root.
@@ -93,7 +92,7 @@ export async function put(key: string, body: Buffer): Promise<void> {
   await writeFile(target, body);
 }
 
-export async function get(key: string): Promise<Buffer | null> {
+async function localGet(key: string): Promise<Buffer | null> {
   if (!isSafeKey(key)) return null;
   const target = path.join(ROOT, key);
   if (!target.startsWith(ROOT + path.sep)) return null;
@@ -105,7 +104,7 @@ export async function get(key: string): Promise<Buffer | null> {
   }
 }
 
-export async function remove(key: string): Promise<void> {
+async function localRemove(key: string): Promise<void> {
   if (!isSafeKey(key)) return;
   const target = path.join(ROOT, key);
   if (!target.startsWith(ROOT + path.sep)) return;
@@ -113,7 +112,150 @@ export async function remove(key: string): Promise<void> {
   await rm(target, { force: true });
 }
 
-/** Where the browser fetches the bytes from. Becomes the R2 custom domain later. */
-export function publicUrl(key: string): string {
-  return `/api/media/${key}`;
+/* ------------------------------------------------------------------ *
+ * Supabase Storage
+ *
+ * Spoken to over its REST API rather than through @supabase/supabase-js:
+ * that package bundles realtime, auth and postgrest clients this app does
+ * not use, and the four calls below are the whole surface area.
+ *
+ * The service_role key bypasses every storage policy, so it is read here
+ * and nowhere else -- lib/media-url.ts holds the half that is safe to ship
+ * to a browser.
+ * ------------------------------------------------------------------ */
+
+type SupabaseConfig = { url: string; key: string; bucket: string };
+
+function supabaseConfig(): SupabaseConfig {
+  const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const bucket = process.env.SUPABASE_BUCKET ?? process.env.NEXT_PUBLIC_SUPABASE_BUCKET;
+
+  if (!url || !key || !bucket) {
+    throw new Error(
+      "STORAGE_DRIVER=supabase needs SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY and SUPABASE_BUCKET",
+    );
+  }
+  return { url: url.replace(/\/+$/, ""), key, bucket };
 }
+
+function serviceHeaders(cfg: SupabaseConfig): Record<string, string> {
+  return { apikey: cfg.key, Authorization: `Bearer ${cfg.key}` };
+}
+
+const CONTENT_TYPE_BY_EXT: Record<string, string> = {
+  jpg: "image/jpeg",
+  png: "image/png",
+  webp: "image/webp",
+  avif: "image/avif",
+};
+
+function contentTypeFor(key: string): string {
+  return CONTENT_TYPE_BY_EXT[key.split(".").pop() ?? ""] ?? "application/octet-stream";
+}
+
+/**
+ * A real presigned upload. The browser PUTs the blob straight to Supabase,
+ * so the bytes never pass through this server -- which is the property
+ * PLAN.md 4.3 asked for and the local driver could only imitate.
+ */
+async function supabaseUploadUrl(key: string): Promise<UploadTarget> {
+  if (!isSafeKey(key)) throw new Error("Bad key");
+  const cfg = supabaseConfig();
+
+  const response = await fetch(
+    `${cfg.url}/storage/v1/object/upload/sign/${cfg.bucket}/${key}`,
+    { method: "POST", headers: serviceHeaders(cfg) },
+  );
+  if (!response.ok) {
+    throw new Error(`Could not sign upload (${response.status})`);
+  }
+
+  // Returns a path like /object/upload/sign/<bucket>/<key>?token=…
+  const { url: signed } = (await response.json()) as { url: string };
+  return {
+    url: `${cfg.url}/storage/v1${signed}`,
+    key,
+    // Supabase sets its own expiry on the token; this is for the caller's
+    // benefit only, and is deliberately shorter than the token's life.
+    expires: Date.now() + UPLOAD_TTL_MS,
+  };
+}
+
+async function supabasePut(key: string, body: Buffer): Promise<void> {
+  if (!isSafeKey(key)) throw new Error("Bad key");
+  const cfg = supabaseConfig();
+
+  const response = await fetch(`${cfg.url}/storage/v1/object/${cfg.bucket}/${key}`, {
+    method: "POST",
+    headers: {
+      ...serviceHeaders(cfg),
+      /* Informational only: Supabase derives the type it serves from the
+         file extension and ignores this header, which is why the key's
+         extension has to be truthful (see scripts/fix-media-keys.ts). */
+      "Content-Type": contentTypeFor(key),
+      // Re-running a migration or a seed should overwrite, not fail.
+      "x-upsert": "true",
+    },
+    body: new Uint8Array(body),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Upload failed (${response.status}): ${await response.text()}`);
+  }
+}
+
+async function supabaseGet(key: string): Promise<Buffer | null> {
+  if (!isSafeKey(key)) return null;
+  const cfg = supabaseConfig();
+
+  const response = await fetch(`${cfg.url}/storage/v1/object/${cfg.bucket}/${key}`, {
+    headers: serviceHeaders(cfg),
+  });
+  if (!response.ok) return null;
+  return Buffer.from(await response.arrayBuffer());
+}
+
+async function supabaseRemove(key: string): Promise<void> {
+  if (!isSafeKey(key)) return;
+  const cfg = supabaseConfig();
+
+  // A missing object is the desired end state either way, so a 404 is fine.
+  await fetch(`${cfg.url}/storage/v1/object/${cfg.bucket}/${key}`, {
+    method: "DELETE",
+    headers: serviceHeaders(cfg),
+  });
+}
+
+/* ------------------------------------------------------------------ *
+ * Driver selection
+ *
+ * Read per call rather than once at module load: the migration script has
+ * to reach both drivers in the same process.
+ * ------------------------------------------------------------------ */
+
+export function usingSupabase(): boolean {
+  return (process.env.STORAGE_DRIVER ?? "local") === "supabase";
+}
+
+export async function createUploadUrl(key: string): Promise<UploadTarget> {
+  return usingSupabase() ? supabaseUploadUrl(key) : localUploadUrl(key);
+}
+
+export async function put(key: string, body: Buffer): Promise<void> {
+  return usingSupabase() ? supabasePut(key, body) : localPut(key, body);
+}
+
+export async function get(key: string): Promise<Buffer | null> {
+  return usingSupabase() ? supabaseGet(key) : localGet(key);
+}
+
+export async function remove(key: string): Promise<void> {
+  return usingSupabase() ? supabaseRemove(key) : localRemove(key);
+}
+
+/** Explicit access to each driver, for moving files from one to the other. */
+export const drivers = {
+  local: { put: localPut, get: localGet, remove: localRemove },
+  supabase: { put: supabasePut, get: supabaseGet, remove: supabaseRemove },
+};

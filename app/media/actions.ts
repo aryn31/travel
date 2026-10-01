@@ -36,7 +36,9 @@ export async function requestUpload(
   }
 
   const key = newKey(viewer.userId, mime);
-  const target = createUploadUrl(key);
+  // Async now: the Supabase driver has to ask Supabase to sign the URL,
+  // where the local one could compute an HMAC on the spot.
+  const target = await createUploadUrl(key);
   return { ok: true, url: target.url, key: target.key };
 }
 

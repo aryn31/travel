@@ -1,5 +1,6 @@
 import { Fragment, type ReactNode } from "react";
 import { isDoc, type Node } from "@/lib/story-doc";
+import { keyFromSrc, publicUrl } from "@/lib/media-url";
 
 /**
  * Renders a TipTap doc as React. Deliberately an allow-list: any node or mark
@@ -135,9 +136,22 @@ function renderNode(node: Node, key: string): ReactNode {
       );
 
     case "image": {
-      const src = typeof node.attrs?.src === "string" ? node.attrs.src : null;
-      // Same reasoning as links: only sources this app serves.
-      if (!src || !src.startsWith("/api/media/")) return null;
+      const stored = typeof node.attrs?.src === "string" ? node.attrs.src : null;
+      /*
+       * Resolve back to the storage key and re-render the URL, rather than
+       * trusting whatever was baked into the document when the image was
+       * inserted. A body written before the move holds /api/media/<key>
+       * and one written after holds a bucket URL; both end up pointing at
+       * wherever storage lives now, and the next provider change needs no
+       * data migration either.
+       *
+       * Still an allow-list, and a stricter one than the prefix test it
+       * replaced: an src that is not one of our own shapes, or whose key
+       * fails validation, resolves to null and renders nothing.
+       */
+      const key = stored ? keyFromSrc(stored) : null;
+      if (!key) return null;
+      const src = publicUrl(key);
 
       const alt = typeof node.attrs?.alt === "string" ? node.attrs.alt : "";
       const width = Number(node.attrs?.width) || undefined;

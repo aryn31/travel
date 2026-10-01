@@ -4,6 +4,7 @@ import { db } from "../lib/db";
 import { users } from "../lib/db/schema";
 import { hashPassword } from "../lib/password";
 import { SEED_DOMAIN, SEED_PASSWORD } from "./seed-config";
+import { requireLocalDatabase } from "./guard";
 
 /**
  * Gives every seeded account the shared dev password, without touching the
@@ -14,6 +15,9 @@ import { SEED_DOMAIN, SEED_PASSWORD } from "./seed-config";
  * one-column update.
  */
 async function main() {
+  // Overwrites passwords; harmless locally, not harmless anywhere else.
+  requireLocalDatabase("seed:auth");
+
   const passwordHash = await hashPassword(SEED_PASSWORD);
 
   const rows = await db

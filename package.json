@@ -13,6 +13,8 @@
     "db:migrate": "drizzle-kit migrate",
     "db:generate": "drizzle-kit generate",
     "check:media": "tsx --env-file=.env.local scripts/check-media.ts",
+    "storage:migrate": "tsx --env-file=.env.local scripts/migrate-storage.ts",
+    "storage:fixkeys": "tsx --env-file=.env.local scripts/fix-media-keys.ts",
     "photo": "tsx --env-file=.env.local scripts/photo-preview.ts"
   },
   "dependencies": {

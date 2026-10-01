@@ -10,6 +10,7 @@ import { landscapePng, type Palette } from "./photo";
 import { AUTHORS, type SeedBlock } from "./seed-stories";
 import { findPhoto } from "./commons";
 import { SEED_DOMAIN, SEED_PASSWORD } from "./seed-config";
+import { requireLocalDatabase } from "./guard";
 import { hashPassword } from "../lib/password";
 
 
@@ -195,6 +196,8 @@ async function buildDoc(
 
 async function main() {
   const wipeOnly = process.argv.includes("--wipe");
+  // Deletes every seeded account before rebuilding, wipe or not.
+  requireLocalDatabase(wipeOnly ? "seed:wipe" : "seed");
 
   // Idempotent: seeded accounts are identifiable by their email domain, so a
   // re-run replaces them and never touches a real account.
@@ -335,10 +338,17 @@ async function main() {
   for (const m of all) {
     if (await get(m.storageKey)) continue;
     const seedNum = [...m.id].reduce((a, c) => a + c.charCodeAt(0), 0);
-    await put(
-      m.storageKey,
-      landscapePng(m.width, m.height, seedNum, palette(seedNum % 360, 0)),
-    );
+    const bytes = landscapePng(m.width, m.height, seedNum, palette(seedNum % 360, 0));
+    await put(m.storageKey, bytes);
+
+    // Record what was actually written. Skipping this left six rows
+    // claiming to be small WebPs while holding large PNGs -- harmless on
+    // local disk, but it became a wrong Content-Type the moment the files
+    // moved to a bucket that serves what it is told.
+    await db
+      .update(media)
+      .set({ bytes: bytes.byteLength, mime: "image/png" })
+      .where(eq(media.id, m.id));
     repaired++;
   }
   if (repaired > 0) console.log(`  repaired ${repaired} missing image files`);

@@ -8,7 +8,13 @@ export default defineConfig({
   schema: "./lib/db/schema.ts",
   out: "./lib/db/migrations",
   dialect: "postgresql",
-  dbCredentials: { url: process.env.DATABASE_URL! },
+  /*
+   * Migrations run DDL inside transactions, which a transaction-mode
+   * connection pooler cannot carry. Against a pooled provider (Supabase,
+   * Neon) DATABASE_URL points at the pooler and DIRECT_URL at the database
+   * itself; locally there is no pooler and the two are the same thing.
+   */
+  dbCredentials: { url: process.env.DIRECT_URL ?? process.env.DATABASE_URL! },
   strict: true,
   verbose: true,
 });
