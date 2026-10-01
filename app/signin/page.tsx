@@ -1,12 +1,19 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getViewer } from "@/lib/session";
+import { safeNext } from "@/lib/next-path";
 import { SignInForm } from "./SignInForm";
 
 export const metadata = { title: "Sign in" };
 
-export default async function SignInPage() {
+export default async function SignInPage({
+  searchParams,
+}: PageProps<"/signin">) {
   if (await getViewer()) redirect("/");
+  const next = safeNext(
+    (await searchParams).next as string | undefined,
+    "",
+  );
 
   return (
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center px-6 py-20">
@@ -15,7 +22,7 @@ export default async function SignInPage() {
         <p className="mb-8 mt-2 text-muted">
           To write and publish travel stories.
         </p>
-        <SignInForm />
+        <SignInForm next={next} />
       </div>
 
       <p className="mt-6 text-center text-sm text-muted">

@@ -8,7 +8,7 @@ import { createAccount, type SignUpState } from "./actions";
 
 const initial: SignUpState = {};
 
-export function SignUpForm() {
+export function SignUpForm({ next = "" }: { next?: string }) {
   const [state, action, pending] = useActionState(createAccount, initial);
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -19,6 +19,7 @@ export function SignUpForm() {
 
   return (
     <form action={action} className="flex flex-col gap-5">
+      {next && <input type="hidden" name="next" value={next} />}
       <Field
         label="Email address"
         htmlFor="email"

@@ -17,21 +17,27 @@ const initial: SignInState = {};
  * people expect; the link path stays because there is no email provider
  * configured, so it is also the only account recovery that exists.
  */
-export function SignInForm() {
+export function SignInForm({ next = "" }: { next?: string }) {
   const [mode, setMode] = useState<"password" | "link">("password");
 
   return mode === "password" ? (
-    <PasswordForm onUseLink={() => setMode("link")} />
+    <PasswordForm next={next} onUseLink={() => setMode("link")} />
   ) : (
-    <LinkForm onUsePassword={() => setMode("password")} />
+    <LinkForm next={next} onUsePassword={() => setMode("password")} />
   );
 }
 
-function PasswordForm({ onUseLink }: { onUseLink: () => void }) {
+/** Where to land after signing in. Re-validated server-side. */
+function NextField({ next }: { next: string }) {
+  return next ? <input type="hidden" name="next" value={next} /> : null;
+}
+
+function PasswordForm({ next, onUseLink }: { next: string; onUseLink: () => void }) {
   const [state, action, pending] = useActionState(signInWithPassword, initial);
 
   return (
     <form action={action} className="flex flex-col gap-5">
+      <NextField next={next} />
       <Field
         label="Email address"
         htmlFor="email"
@@ -87,7 +93,7 @@ function PasswordForm({ onUseLink }: { onUseLink: () => void }) {
         </button>
         <p className="text-muted">
           No account?{" "}
-          <Link href="/signup" className="text-accent underline underline-offset-2">
+          <Link href={next ? `/signup?next=${encodeURIComponent(next)}` : "/signup"} className="text-accent underline underline-offset-2">
             Create one
           </Link>
         </p>
@@ -96,11 +102,12 @@ function PasswordForm({ onUseLink }: { onUseLink: () => void }) {
   );
 }
 
-function LinkForm({ onUsePassword }: { onUsePassword: () => void }) {
+function LinkForm({ next, onUsePassword }: { next: string; onUsePassword: () => void }) {
   const [state, action, pending] = useActionState(sendMagicLink, initial);
 
   return (
     <form action={action} className="flex flex-col gap-5">
+      <NextField next={next} />
       <Field
         label="Email address"
         htmlFor="email"

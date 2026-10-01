@@ -8,7 +8,13 @@ import { createProfile, type OnboardingState } from "./actions";
 
 const initial: OnboardingState = {};
 
-export function OnboardingForm({ suggestedHandle }: { suggestedHandle: string }) {
+export function OnboardingForm({
+  suggestedHandle,
+  next = "",
+}: {
+  suggestedHandle: string;
+  next?: string;
+}) {
   const [state, action, pending] = useActionState(createProfile, initial);
   const [handle, setHandle] = useState(state.values?.handle ?? suggestedHandle);
 
@@ -16,6 +22,7 @@ export function OnboardingForm({ suggestedHandle }: { suggestedHandle: string })
 
   return (
     <form action={action} className="flex flex-col gap-7">
+      {next && <input type="hidden" name="next" value={next} />}
       <Field
         label="Your handle"
         htmlFor="handle"

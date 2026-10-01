@@ -8,6 +8,7 @@ import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { checkPassword, hashPassword } from "@/lib/password";
 import { createSession } from "@/lib/auth-session";
+import { safeNext } from "@/lib/next-path";
 
 const EmailSchema = z
   .string()
@@ -28,6 +29,7 @@ export async function createAccount(
   const email = String(formData.get("email") ?? "");
   const password = String(formData.get("password") ?? "");
   const confirm = String(formData.get("confirm") ?? "");
+  const next = safeNext(String(formData.get("next") ?? ""), "/");
   const values = { email };
 
   const parsed = EmailSchema.safeParse(email);
@@ -93,6 +95,7 @@ export async function createAccount(
 
   await createSession(created.id);
   revalidatePath("/", "layout");
-  // No profile yet, so onboarding is the only sensible next step.
-  redirect("/onboarding");
+  // No profile yet, so onboarding is the only sensible next step -- it
+  // carries the destination onward once a handle exists.
+  redirect(`/onboarding?next=${encodeURIComponent(next)}`);
 }

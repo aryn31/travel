@@ -160,3 +160,30 @@ export function imageUrls(doc: unknown): string[] {
   for (const node of doc.content) walk(node);
   return found;
 }
+
+/**
+ * The opening of a story: the first `blocks` prose blocks, images dropped.
+ *
+ * Used for the signed-out teaser. Images are left out on purpose -- the
+ * photographs are the most expensive thing on the page and the most
+ * valuable thing to withhold, and a teaser that loads three 300KB covers
+ * costs more to serve than the story it is holding back.
+ */
+export function openingOf(doc: unknown, blocks = 3): StoryDoc {
+  if (!isDoc(doc)) return EMPTY_DOC;
+
+  const taken: Node[] = [];
+  for (const node of doc.content) {
+    if (taken.length >= blocks) break;
+    if (node.type === "image") continue;
+    if (collectText(node).trim().length === 0) continue;
+    taken.push(node);
+  }
+  return { type: "doc", content: taken };
+}
+
+/** Whether a doc has more to show than its opening -- i.e. a wall is worth it. */
+export function hasMoreThanOpening(doc: unknown, blocks = 3): boolean {
+  if (!isDoc(doc)) return false;
+  return doc.content.filter((n) => n.type !== "image").length > blocks;
+}

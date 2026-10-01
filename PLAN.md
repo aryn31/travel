@@ -221,6 +221,20 @@ build (`npm run build && npm start`, not dev mode — dev numbers are
 meaningless), seed 15–20 stories of your own so every list, search result, and
 empty state is exercised with real content rather than lorem ipsum.
 
+*Free-read meter:* signed-out visitors get one story, then `ReadWall`
+replaces the rest. The count lives in an httpOnly cookie of `handle/slug`
+keys -- re-opening a story you already spent stays free forever, or a
+refresh would slam the wall shut mid-read. It is written in `proxy.ts`
+because a Server Component cannot set a cookie and the meter has to be
+written on the same request that serves the story; Next 16 renamed
+`middleware` to `proxy` and defaults it to the Node.js runtime. The proxy
+does no database work and makes no decision -- it reports the cookie's
+verdict through a request header (always set, never merely absent, so
+"signed in" is distinguishable from "proxy never ran") and the page, which
+knows the real viewer, decides. The withheld blocks are never serialised
+into the HTML: a CSS-only fade is one Reader Mode away from nothing. A soft
+wall, not an entitlement check -- the content is public by design.
+
 *Auth as built:* email + password, with the magic link kept as the second
 way in -- which matters because with no mail provider configured the link is
 the only account recovery that exists. Passwords are scrypt (N=2^15) from

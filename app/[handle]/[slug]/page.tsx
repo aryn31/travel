@@ -1,12 +1,15 @@
 import Link from "next/link";
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { media, profiles, stories } from "@/lib/db/schema";
 import { getViewer } from "@/lib/session";
-import { excerpt } from "@/lib/story-doc";
+import { excerpt, hasMoreThanOpening, openingOf } from "@/lib/story-doc";
+import { METER_HEADER } from "@/lib/meter";
 import { publicUrl } from "@/lib/storage";
 import { StoryBody } from "@/components/StoryBody";
+import { ReadWall } from "@/components/ReadWall";
 import { Avatar } from "@/components/ui/Avatar";
 import { PlaceMark } from "@/components/ui/PlaceMark";
 import { ButtonLink } from "@/components/ui/Button";
@@ -65,6 +68,25 @@ export default async function StoryPage({
   // by anyone but its author.
   if (story.status === "draft" && !isAuthor) notFound();
 
+  /*
+   * The free-read meter. proxy.ts counts the read and reports what the
+   * cookie said; the decision is made here, because only this side knows
+   * whether the viewer is real. A signed-in reader is never walled, and a
+   * session cookie that no longer resolves to a viewer is treated as signed
+   * out -- which is the right answer for an expired session.
+   *
+   * Walling a story with barely more than its opening would withhold almost
+   * nothing and annoy the reader for it, so short pieces stay open.
+   */
+  const meterVerdict = (await headers()).get(METER_HEADER);
+  const walled =
+    !viewer &&
+    // "bypass" with no viewer means a session cookie that no longer
+    // resolves -- an expired session, which should be asked to sign in.
+    // A missing header means the proxy did not run; fail open there.
+    (meterVerdict === "exhausted" || meterVerdict === "bypass") &&
+    hasMoreThanOpening(story.bodyJson);
+
   return (
     <main className="page flex-1 py-12 pb-24">
       {isAuthor && story.status !== "published" && (
@@ -118,7 +140,17 @@ export default async function StoryPage({
         */}
         <div className="mt-12 grid gap-10 lg:grid-cols-[minmax(0,1fr)_16rem] lg:gap-16">
           <div className="min-w-0">
-            <StoryBody doc={story.bodyJson} />
+            {/* The withheld blocks are never serialised into the page --
+                a CSS-only fade is one Reader Mode away from nothing. */}
+            <StoryBody doc={walled ? openingOf(story.bodyJson) : story.bodyJson} />
+            {walled && (
+              <ReadWall
+                title={story.title}
+                authorName={profile.displayName}
+                handle={profile.handle}
+                slug={story.slug}
+              />
+            )}
           </div>
 
           <aside className="lg:order-2">

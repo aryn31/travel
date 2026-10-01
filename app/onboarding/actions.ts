@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { profiles } from "@/lib/db/schema";
 import { getViewer } from "@/lib/session";
 import { normalizeHandle } from "@/lib/handles";
+import { safeNext } from "@/lib/next-path";
 
 // React 19 resets an uncontrolled form once its action resolves. Echo the
 // submitted values back so a rejected handle doesn't cost the user everything
@@ -24,6 +25,7 @@ export async function createProfile(
   if (!viewer) redirect("/signin");
   if (viewer.profile) redirect(`/@${viewer.profile.handle}`);
 
+  const next = safeNext(String(formData.get("next") ?? ""), "");
   const rawHandle = String(formData.get("handle") ?? "");
   const displayName = String(formData.get("displayName") ?? "").trim();
   const values = { handle: rawHandle, displayName };
@@ -57,5 +59,6 @@ export async function createProfile(
   // navigations -- without this it keeps showing "Finish setup" until a
   // full reload.
   revalidatePath("/", "layout");
-  redirect(`/@${checked.handle}`);
+  // Back to whatever sent them here -- usually a story behind the wall.
+  redirect(next || `/@${checked.handle}`);
 }
