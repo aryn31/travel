@@ -48,9 +48,6 @@ export function SiteFooter() {
                   <FooterLink href="/">Home</FooterLink>
                 </li>
                 <li>
-                  <FooterLink href="/stories">All stories</FooterLink>
-                </li>
-                <li>
                   <FooterLink href="/#latest">The latest</FooterLink>
                 </li>
               </ul>
@@ -76,7 +73,18 @@ export function SiteFooter() {
           </div>
 
           <div className="mt-12 flex flex-col gap-3 border-t border-rule pt-6 text-xs leading-relaxed text-muted sm:flex-row sm:items-center sm:justify-between">
-            <p>Set in Fraunces and Geist.</p>
+            <p className="flex flex-wrap items-center gap-x-4 gap-y-2">
+              {/* Deliberately in the bottom bar rather than a column: a way
+                  to reach a person is the last thing someone looks for, and
+                  the last place they look is here. */}
+              <Link
+                href="/contact"
+                className="font-medium text-foreground underline underline-offset-4 transition-colors hover:text-accent"
+              >
+                Contact us
+              </Link>
+              <span>Set in Fraunces and Geist.</span>
+            </p>
             {/* The seeded photographs come from Commons under CC licences,
                 and those licences require the credit to appear somewhere. */}
             <p>

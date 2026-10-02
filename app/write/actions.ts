@@ -10,6 +10,7 @@ import { getViewer } from "@/lib/session";
 import { slugForTitle } from "@/lib/stories";
 import { docToSummary, docToText, isDoc, readingMinutes } from "@/lib/story-doc";
 import { remove as removeFromStorage } from "@/lib/storage";
+import { reconcileStoryMedia } from "@/lib/media-gc";
 import { isCountryCode } from "@/lib/countries";
 
 /**
@@ -113,6 +114,14 @@ export async function saveStory(
       updatedAt: new Date(),
     })
     .where(eq(stories.id, story.id));
+
+  /*
+   * An image dropped from the body has just stopped being referenced. This
+   * marks it, and sweeps anything that has stayed unreferenced past the
+   * grace period -- without it, every deleted image left its file in the
+   * bucket permanently.
+   */
+  await reconcileStoryMedia(story.id);
 
   if (story.status !== "draft") await revalidateStory(story.authorId, slug);
   return { ok: true, savedAt: Date.now() };
@@ -224,6 +233,10 @@ export async function setCover(storyId: string, mediaId: string | null) {
     .update(stories)
     .set({ coverMediaId: mediaId, updatedAt: new Date() })
     .where(eq(stories.id, story.id));
+
+  // Removing a cover leaves its image referenced by nothing, unless the
+  // body happens to use it too -- which reconcile works out.
+  await reconcileStoryMedia(story.id);
 
   if (story.status !== "draft") await revalidateStory(story.authorId, story.slug);
 }

@@ -1,5 +1,4 @@
 import NextAuth from "next-auth";
-import type { EmailConfig } from "next-auth/providers";
 import { DrizzleAdapter } from "@auth/drizzle-adapter";
 import { db } from "@/lib/db";
 import {
@@ -9,32 +8,6 @@ import {
   verificationTokens,
 } from "@/lib/db/schema";
 
-/**
- * Dev-only magic link: prints the sign-in URL to the terminal instead of
- * sending mail. Swapping this for Resend is a drop-in replacement of
- * sendVerificationRequest -- nothing else in the app changes. See PLAN.md 10.4.
- */
-const TerminalMagicLink = {
-  id: "terminal",
-  type: "email",
-  name: "Email",
-  from: "dev@localhost",
-  maxAge: 15 * 60,
-  options: {},
-  async sendVerificationRequest({
-    identifier,
-    url,
-  }: {
-    identifier: string;
-    url: string;
-  }) {
-    const line = "─".repeat(72);
-    console.log(
-      `\n${line}\n  SIGN-IN LINK for ${identifier}\n  (expires in 15 minutes -- cmd-click to open)\n\n  ${url}\n${line}\n`,
-    );
-  },
-} as EmailConfig;
-
 export const { handlers, signIn, signOut, auth } = NextAuth({
   adapter: DrizzleAdapter(db, {
     usersTable: users,
@@ -42,12 +15,18 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     sessionsTable: sessions,
     verificationTokensTable: verificationTokens,
   }),
-  providers: [TerminalMagicLink],
+  /*
+   * No providers: sign-in is email and password, verified in
+   * app/signin/actions.ts and turned into a session row by
+   * lib/auth-session.ts. Auth.js is kept for what it is still doing -- the
+   * adapter, the session cookie and signOut() -- not for a sign-in flow it
+   * no longer owns.
+   */
+  providers: [],
   session: { strategy: "database" },
   trustHost: true,
   pages: {
     signIn: "/signin",
-    verifyRequest: "/signin/check",
     error: "/signin",
   },
   callbacks: {

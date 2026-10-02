@@ -226,3 +226,44 @@ export async function setAvatar(avatarKey: string | null): Promise<AvatarState> 
   revalidatePath("/", "layout");
   return { ok: true, avatarKey };
 }
+
+export type CoverState = { ok: true; coverKey: string | null } | { ok: false; error: string };
+
+/**
+ * Points the profile at an already-uploaded banner, or clears it.
+ *
+ * Same shape as setAvatar, and the same ownership check: every key is minted
+ * as `<userId>/<uuid>.<ext>`, so a key not prefixed with this user's id was
+ * never issued to them.
+ */
+export async function setCoverPhoto(coverKey: string | null): Promise<CoverState> {
+  const viewer = await getViewer();
+  if (!viewer) redirect("/signin");
+  if (!viewer.profile) redirect("/onboarding");
+
+  if (coverKey !== null) {
+    if (!isSafeKey(coverKey) || !coverKey.startsWith(`${viewer.userId}/`)) {
+      return { ok: false, error: "That upload isn't yours." };
+    }
+  }
+
+  const previous = viewer.profile.coverKey;
+
+  await db
+    .update(profiles)
+    .set({ coverKey, updatedAt: new Date() })
+    .where(eq(profiles.userId, viewer.userId));
+
+  // Nothing else can reference a cover key, so the file it replaced is
+  // storage nobody will ever reclaim.
+  if (previous && previous !== coverKey) {
+    try {
+      await removeFromStorage(previous);
+    } catch {
+      /* the row is already updated; an orphaned file is the lesser problem */
+    }
+  }
+
+  revalidatePath("/", "layout");
+  return { ok: true, coverKey };
+}

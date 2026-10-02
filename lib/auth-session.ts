@@ -85,3 +85,16 @@ export async function revokeOtherSessions(userId: string) {
     await db.delete(sessions).where(eq(sessions.sessionToken, row.token));
   }
 }
+
+/**
+ * Deletes every session a user has, including the caller's own.
+ *
+ * Used after a password reset. revokeOtherSessions() deliberately keeps the
+ * current one so changing a password in settings does not sign you out of
+ * the tab you changed it in -- but a reset is the opposite case: whoever
+ * followed the emailed link has proved only that they read the mailbox, and
+ * every existing session predates that proof.
+ */
+export async function revokeAllSessions(userId: string) {
+  await db.delete(sessions).where(eq(sessions.userId, userId));
+}

@@ -1,13 +1,12 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { media, profiles, stories } from "@/lib/db/schema";
 import { getViewer } from "@/lib/session";
 import { publicUrl } from "@/lib/storage";
 import { StoryList } from "@/components/StoryList";
-import { Avatar } from "@/components/ui/Avatar";
-import { ButtonLink } from "@/components/ui/Button";
+import { ProfileHeader } from "@/components/ProfileHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
 
 async function loadProfile(segment: string) {
@@ -41,11 +40,34 @@ export async function generateMetadata({ params }: PageProps<"/[handle]">) {
  */
 export default async function ProfilePage({ params }: PageProps<"/[handle]">) {
   const { handle } = await params;
+  const viewer = await getViewer();
+
+  /*
+   * Members only, like the archive. Individual stories stay open -- the
+   * free-read meter governs those -- so a shared link still works for a
+   * stranger; it is the people pages and the archive that an account buys.
+   *
+   * Checked before the profile is loaded: answering "no such person" to a
+   * signed-out visitor would make this a way to test which handles exist
+   * without ever having an account.
+   *
+   * The shape check comes first so a mistyped path still 404s -- otherwise
+   * every unmatched top-level URL falls into this route and answers with a
+   * sign-in form, which is a strange thing for /abuot to do. And the
+   * segment arrives percent-encoded ("%40mira"), so it is decoded before
+   * going back into `next`; encoding it as-is produced /@%40mira.
+   */
+  const raw = decodeURIComponent(handle);
+  if (!raw.startsWith("@")) notFound();
+
+  if (!viewer) {
+    redirect(`/signin?next=${encodeURIComponent(`/${raw}`)}`);
+  }
+
   const profile = await loadProfile(handle);
   if (!profile) notFound();
 
-  const viewer = await getViewer();
-  const isMe = viewer?.userId === profile.userId;
+  const isMe = viewer.userId === profile.userId;
 
   const rows = await db
     .select({
@@ -83,83 +105,20 @@ export default async function ProfilePage({ params }: PageProps<"/[handle]">) {
       : null,
   }));
 
+  /* Derived here rather than queried: the rows are already loaded, and a
+     second round trip to Supabase to count what is in memory is latency
+     for nothing. */
+  const countries = [...new Set(published.map((p) => p.countryCode).filter(Boolean))] as string[];
+  const minutes = published.reduce((n, p) => n + p.readingMinutes, 0);
+  const [newest, ...rest] = published;
+
   return (
     <main className="flex-1">
-      <header className="border-b border-rule bg-surface">
-        <div className="page py-12 sm:py-16">
-          <div className="flex flex-wrap items-start justify-between gap-6">
-            <div className="flex items-center gap-5">
-              <Avatar
-                name={profile.displayName}
-                handle={profile.handle}
-                avatarKey={profile.avatarKey}
-                size="lg"
-              />
-              <div className="min-w-0">
-                <h1 className="font-display text-4xl font-semibold tracking-tight">
-                  {profile.displayName}
-                </h1>
-                <p className="mt-1 text-muted">@{profile.handle}</p>
-              </div>
-            </div>
-            {isMe && (
-              <div className="flex flex-wrap items-center gap-2">
-                <ButtonLink href="/settings" variant="secondary" size="sm">
-                  Edit profile
-                </ButtonLink>
-                <ButtonLink href="/drafts" variant="secondary" size="sm">
-                  Your stories
-                </ButtonLink>
-              </div>
-            )}
-          </div>
-
-          {profile.bio && (
-            <p className="mt-6 max-w-prose leading-relaxed">{profile.bio}</p>
-          )}
-
-          <dl className="mt-6 flex flex-wrap gap-x-7 gap-y-2 text-sm text-muted">
-            <div className="flex gap-1.5">
-              <dt className="sr-only">Stories published</dt>
-              <dd className="font-medium text-foreground">{published.length}</dd>
-              <span>{published.length === 1 ? "story" : "stories"}</span>
-            </div>
-            {profile.homeCountry && (
-              <div className="flex gap-1.5">
-                <dt className="sr-only">Based in</dt>
-                <dd>Based in {profile.homeCountry}</dd>
-              </div>
-            )}
-            {profile.website && (
-              <div className="flex min-w-0 gap-1.5">
-                <dt className="sr-only">Website</dt>
-                <dd className="min-w-0">
-                  <a
-                    href={profile.website}
-                    // User-supplied link on a public page: same policy the
-                    // story renderer applies to links in prose.
-                    rel="noopener noreferrer nofollow ugc"
-                    target="_blank"
-                    className="block truncate text-accent underline underline-offset-2"
-                  >
-                    {profile.website.replace(/^https?:\/\//, "").replace(/\/$/, "")}
-                  </a>
-                </dd>
-              </div>
-            )}
-            <div className="flex gap-1.5">
-              <dt className="sr-only">Joined</dt>
-              <dd>
-                Joined{" "}
-                {profile.createdAt.toLocaleDateString(undefined, {
-                  month: "long",
-                  year: "numeric",
-                })}
-              </dd>
-            </div>
-          </dl>
-        </div>
-      </header>
+      <ProfileHeader
+        profile={profile}
+        stats={{ stories: published.length, countries, minutes }}
+        isMe={isMe}
+      />
 
       <div className="page py-10 pb-24">
         {published.length === 0 ? (
@@ -177,7 +136,22 @@ export default async function ProfilePage({ params }: PageProps<"/[handle]">) {
             )}
           </EmptyState>
         ) : (
-          <StoryList stories={published} showAuthor={false} />
+          <>
+            {/* The newest at poster size, the rest as rows -- the same
+                hierarchy the home page uses, so a profile does not read as
+                an undifferentiated list of everything. */}
+            <StoryList stories={[newest]} showAuthor={false} featured />
+
+            {rest.length > 0 && (
+              <section className="mt-16">
+                <div className="mb-6 flex items-baseline gap-4">
+                  <h2 className="eyebrow">Earlier</h2>
+                  <span aria-hidden className="h-px flex-1 bg-rule" />
+                </div>
+                <StoryList stories={rest} showAuthor={false} />
+              </section>
+            )}
+          </>
         )}
       </div>
     </main>

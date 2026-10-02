@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { getViewer } from "@/lib/session";
 import {
   countryFacets,
   matchingWriters,
@@ -37,7 +39,27 @@ export async function generateMetadata({
 export default async function StoriesPage({
   searchParams,
 }: PageProps<"/stories">) {
-  const query = parseQuery(await searchParams);
+  const raw = await searchParams;
+
+  /*
+   * The archive is for members. A signed-out reader can still find any one
+   * story -- the home page lists them, and the free-read meter lets them
+   * finish one -- but browsing and searching everything is what an account
+   * buys.
+   *
+   * The whole query travels in `next`, so signing in returns them to the
+   * search they were trying to run rather than to an empty archive.
+   */
+  if (!(await getViewer())) {
+    const qs = new URLSearchParams(
+      Object.entries(raw).flatMap(([k, v]) =>
+        typeof v === "string" ? [[k, v] as [string, string]] : [],
+      ),
+    ).toString();
+    redirect(`/signin?next=${encodeURIComponent(qs ? `/stories?${qs}` : "/stories")}`);
+  }
+
+  const query = parseQuery(raw);
 
   const [{ results, total, pages }, facets, writers] = await Promise.all([
     searchStories(query),

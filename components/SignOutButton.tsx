@@ -5,7 +5,9 @@ export function SignOutButton() {
     <form
       action={async () => {
         "use server";
-        await signOut({ redirectTo: "/" });
+        // ?flash= is read by components/FlashNotice.tsx, which says so
+        // out loud and then strips the parameter.
+        await signOut({ redirectTo: "/?flash=signedout" });
       }}
     >
       <button

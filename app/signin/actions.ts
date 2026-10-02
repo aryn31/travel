@@ -4,7 +4,6 @@ import { z } from "zod";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { eq, sql } from "drizzle-orm";
-import { signIn } from "@/auth";
 import { db } from "@/lib/db";
 import { profiles, users } from "@/lib/db/schema";
 import { verifyPassword } from "@/lib/password";
@@ -25,28 +24,7 @@ export type SignInState = {
   error?: string;
   field?: "email" | "password";
   values?: { email: string };
-  /** Set when the address exists but has no password yet. */
-  useLink?: boolean;
 };
-
-export async function sendMagicLink(
-  _prev: SignInState,
-  formData: FormData,
-): Promise<SignInState> {
-  const email = String(formData.get("email") ?? "");
-  const next = safeNext(String(formData.get("next") ?? ""), "/onboarding");
-  const parsed = EmailSchema.safeParse(email);
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0].message, field: "email", values: { email } };
-  }
-
-  // signIn throws a redirect on success, so it must stay outside any try/catch.
-  await signIn("terminal", {
-    email: parsed.data,
-    redirectTo: `/onboarding?next=${encodeURIComponent(next)}`,
-  });
-  return {};
-}
 
 export async function signInWithPassword(
   _prev: SignInState,
@@ -70,9 +48,8 @@ export async function signInWithPassword(
   if (!gate.allowed) {
     const minutes = Math.ceil(gate.retryAfterSeconds / 60);
     return {
-      error: `Too many attempts. Try again in ${minutes} minute${minutes === 1 ? "" : "s"}, or sign in with a link instead.`,
+      error: `Too many attempts. Try again in ${minutes} minute${minutes === 1 ? "" : "s"}.`,
       values,
-      useLink: true,
     };
   }
 
@@ -98,14 +75,16 @@ export async function signInWithPassword(
     return wrong;
   }
 
-  // An account created by magic link has no password to check. This is the
-  // one case worth naming: the alternative is telling someone their correct
-  // password is wrong.
+  /*
+   * An account from before password sign-in existed has nothing to check
+   * against. Worth naming rather than folding into "does not match": the
+   * alternative is telling someone their correct password is wrong, and
+   * the way out -- a reset link -- is not something they would guess.
+   */
   if (!row.passwordHash) {
     return {
-      error: "This account has no password yet. Sign in with a link, then set one in your profile.",
+      error: "This account has no password yet. Use “Forgot your password?” to set one.",
       values,
-      useLink: true,
     };
   }
 

@@ -2,7 +2,8 @@
 
 import { useActionState, useState } from "react";
 import { Button } from "@/components/ui/Button";
-import { Field, inputClass } from "@/components/ui/Field";
+import { Field } from "@/components/ui/Field";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 import { MIN_PASSWORD, PASSWORD_RULES } from "@/lib/password-rules";
 import { changePassword, type PasswordState } from "./actions";
 
@@ -41,12 +42,10 @@ export function PasswordForm({ hasPassword }: { hasPassword: boolean }) {
           htmlFor="current"
           error={state.field === "current" ? state.error : null}
         >
-          <input
+                    <PasswordInput
             id="current"
             name="current"
-            type="password"
             autoComplete="current-password"
-            className={inputClass}
           />
         </Field>
       )}
@@ -57,14 +56,12 @@ export function PasswordForm({ hasPassword }: { hasPassword: boolean }) {
         error={state.field === "next" ? state.error : null}
         hint={tooShort ? `${next.length}/${MIN_PASSWORD} characters` : PASSWORD_RULES}
       >
-        <input
+                <PasswordInput
           id="next"
           name="next"
-          type="password"
           autoComplete="new-password"
           value={next}
-          onChange={(e) => setNext(e.target.value)}
-          className={inputClass}
+          onChange={setNext}
         />
       </Field>
 
@@ -79,14 +76,12 @@ export function PasswordForm({ hasPassword }: { hasPassword: boolean }) {
               : null
         }
       >
-        <input
+                <PasswordInput
           id="confirm"
           name="confirm"
-          type="password"
           autoComplete="new-password"
           value={confirm}
-          onChange={(e) => setConfirm(e.target.value)}
-          className={inputClass}
+          onChange={setConfirm}
         />
       </Field>
 

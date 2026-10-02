@@ -106,6 +106,10 @@ export const profiles = pgTable(
      * far more than a column.
      */
     avatarKey: text("avatar_key"),
+
+    /* The banner across the top of a profile. A key, not a URL, for the
+       reason set out above the avatar column. */
+    coverKey: text("cover_key"),
     website: text("website"),
     homeCountry: text("home_country"),
 
@@ -137,10 +141,11 @@ export type Profile = typeof profiles.$inferSelect;
 /**
  * Password reset links.
  *
- * Separate from Auth.js's `verification_tokens`: that table is the adapter's
- * and holds sign-in links, and overloading it would mean a reset link and a
- * sign-in link becoming interchangeable -- a reset link would log you in,
- * which is not what it is for.
+ * Separate from Auth.js's `verification_tokens`, which belongs to the
+ * adapter. That table is unused now that magic-link sign-in is gone, but it
+ * stays because DrizzleAdapter requires it to be mapped -- and a reset token
+ * has different rules anyway: single use, one hour, and it does not sign
+ * anyone in.
  *
  * Only the SHA-256 of the token is stored. The plaintext exists in the email
  * and nowhere else, so a leaked database does not hand anyone the ability to
@@ -160,6 +165,28 @@ export const passwordResetTokens = pgTable(
   // Issuing a new link invalidates the old ones, which needs this lookup.
   (t) => [index("password_reset_user_idx").on(t.userId)],
 );
+
+/**
+ * A signup waiting on its emailed code.
+ *
+ * Deliberately not a `users` row with emailVerified null: an account that
+ * exists before the address is proved lets anyone squat on an email they do
+ * not control, and it puts rows in `users` that every query then has to
+ * remember to exclude. Nothing enters `users` until the code is right.
+ *
+ * Keyed by email so a second attempt replaces the first rather than leaving
+ * two live codes for one address. Only the hash of the code is stored, and
+ * `attempts` is what actually protects it -- six digits is a million
+ * guesses, which is nothing to a script and a lot to a person.
+ */
+export const pendingSignups = pgTable("pending_signups", {
+  email: text("email").primaryKey(),
+  passwordHash: text("password_hash").notNull(),
+  codeHash: text("code_hash").notNull(),
+  attempts: integer("attempts").notNull().default(0),
+  expires: timestamp("expires", { mode: "date" }).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
 
 export const storyStatus = pgEnum("story_status", [
   "draft",
@@ -194,6 +221,17 @@ export const media = pgTable("media", {
   creditUrl: text("credit_url"),
   license: text("license"),
   sourceUrl: text("source_url"),
+
+  /*
+   * When this image stopped being referenced by its story.
+   *
+   * Not deleted on the spot: removing an image and pressing undo is an
+   * ordinary thing to do, and autosave fires a second later. Deleting the
+   * file immediately would turn undo into a broken image. So it is marked,
+   * and swept once the grace period has passed -- and cleared again if the
+   * image comes back.
+   */
+  orphanedAt: timestamp("orphaned_at"),
 
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });

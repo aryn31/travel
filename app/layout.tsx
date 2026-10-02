@@ -1,8 +1,10 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
 import { Caveat, Fraunces, Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
+import { FlashNotice } from "@/components/FlashNotice";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -80,6 +82,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           Skip to content
         </a>
         <SiteHeader />
+        {/* Suspense because FlashNotice reads useSearchParams, which opts
+            its subtree out of static rendering. */}
+        <Suspense fallback={null}>
+          <FlashNotice />
+        </Suspense>
         <div id="main" className="contents">
           {children}
         </div>

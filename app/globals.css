@@ -536,6 +536,31 @@ body,
   font-family: var(--font-display), ui-serif, Georgia, serif;
 }
 
+/*
+ * The sign-out confirmation drops in from above the fold. Short and eased
+ * out rather than bouncing: it is a receipt, not a celebration.
+ */
+@keyframes flash-drop {
+  from {
+    opacity: 0;
+    transform: translateY(-0.75rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.flash-in {
+  animation: flash-drop 0.35s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flash-in {
+    animation: none;
+  }
+}
+
 /* Used only by the avatar fallback: initials written rather than set. */
 .font-signature {
   font-family: var(--font-signature), "Segoe Script", cursive;

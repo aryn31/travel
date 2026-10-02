@@ -52,6 +52,7 @@ export default async function SettingsPage() {
             homeCountry: p.homeCountry ?? "",
           }}
           initialAvatarKey={p.avatarKey}
+          initialCoverKey={p.coverKey}
         />
       </section>
 

@@ -68,7 +68,12 @@ async function main() {
     : and(like(users.email, `%${SEED_DOMAIN}`), isNull(profiles.avatarKey));
 
   const rows = await db
-    .select({ userId: profiles.userId, handle: profiles.handle, email: users.email })
+    .select({
+      userId: profiles.userId,
+      handle: profiles.handle,
+      email: users.email,
+      previous: profiles.avatarKey,
+    })
     .from(profiles)
     .innerJoin(users, eq(users.id, profiles.userId))
     .where(where);
@@ -95,6 +100,19 @@ async function main() {
       .update(profiles)
       .set({ avatarKey: key, updatedAt: new Date() })
       .where(eq(profiles.userId, row.userId));
+
+    /*
+     * Delete what it replaced. --force used to write a new key and leave
+     * the old file behind; four runs of it put four unreferenced avatars in
+     * the bucket that only a bucket-level scan could find.
+     */
+    if (row.previous && row.previous !== key) {
+      try {
+        await remove(row.previous);
+      } catch {
+        /* the row already points at the new key; a stray is the lesser problem */
+      }
+    }
 
     console.log(`  @${row.handle.padEnd(9)} ${(bytes.byteLength / 1024).toFixed(1)} KB`);
   }

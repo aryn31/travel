@@ -1,17 +1,17 @@
 "use server";
 
-import { redirect } from "next/navigation";
-import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { profiles, users } from "@/lib/db/schema";
+import { users } from "@/lib/db/schema";
 import { checkPassword, hashPassword } from "@/lib/password";
 import { checkToken, spendToken } from "@/lib/password-reset";
-import { createSession, revokeOtherSessions } from "@/lib/auth-session";
+import { revokeAllSessions } from "@/lib/auth-session";
 
 export type ResetState = {
   error?: string;
   field?: "next" | "confirm" | "token";
+  /** Set once the password is changed; the form is replaced by a notice. */
+  done?: boolean;
 };
 
 export async function resetPassword(
@@ -50,20 +50,28 @@ export async function resetPassword(
   await spendToken(token);
 
   /*
-   * Whoever knew the old password keeps a live session otherwise -- and a
-   * reset is very often *because* someone else got in. Every existing
-   * session goes, then a fresh one is created for the person holding the
-   * link, so they end up signed in rather than bounced to a login form.
+   * Every session goes, including any the person doing this already had.
+   * A reset is very often *because* someone else got in, and following an
+   * emailed link proves only that you can read the mailbox -- so nobody
+   * stays signed in on the strength of a session that predates the reset.
+   *
+   * Deliberately not signing them in here either: typing the new password
+   * once on the sign-in page is what turns "I set a password" into "I know
+   * my password", and it costs one form.
    */
-  await revokeOtherSessions(check.userId);
-  await createSession(check.userId);
+  await revokeAllSessions(check.userId);
 
-  const [profile] = await db
-    .select({ handle: profiles.handle })
-    .from(profiles)
-    .where(eq(profiles.userId, check.userId))
-    .limit(1);
-
-  revalidatePath("/", "layout");
-  redirect(profile ? "/settings" : "/onboarding");
+  /*
+   * Deliberately no revalidatePath here.
+   *
+   * app/reset/page.tsx checks the token when it renders, and the token has
+   * just been spent -- so revalidating re-runs that check, the page swaps to
+   * its "link isn't valid" branch, and the form unmounts taking the success
+   * message with it. Someone who had just succeeded was told they had
+   * failed.
+   *
+   * Nothing needs revalidating anyway: every session is gone, and the next
+   * thing this person does is navigate to /signin, which renders fresh.
+   */
+  return { done: true };
 }

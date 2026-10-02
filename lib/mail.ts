@@ -14,6 +14,13 @@ export type Mail = {
   subject: string;
   text: string;
   html: string;
+  /*
+   * Who a reply should go to, when that is not the sender. The contact form
+   * sends from the site's own account -- anything else is forged mail that
+   * Gmail will either rewrite or drop -- so the visitor's address goes here
+   * instead, and hitting reply reaches them.
+   */
+  replyTo?: string;
 };
 
 function driver(): "terminal" | "smtp" {
@@ -35,6 +42,7 @@ function printToTerminal(mail: Mail) {
 
   console.log(
     `\n${line}\n  MAIL to ${mail.to}\n  ${mail.subject}\n` +
+      (mail.replyTo ? `  reply-to ${mail.replyTo}\n` : "") +
       (links.length > 0 ? `\n  ${links.join("\n  ")}\n` : "") +
       `\n${mail.text.trim()}\n${line}\n`,
   );

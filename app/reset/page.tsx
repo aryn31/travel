@@ -16,16 +16,13 @@ export default async function ResetPage({ searchParams }: PageProps<"/reset">) {
   return (
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center px-6 py-20">
       <div className="rounded-2xl border border-rule bg-surface p-8 shadow-[var(--shadow)] sm:p-10">
+        {/* The heading belongs to ResetForm, not here: once the password is
+            set it has to change too, and a server component cannot know
+            that happened. Leaving it here said "Choose a new password /
+            Then you're back in" above a notice explaining that you are in
+            fact signed out. */}
         {check.ok ? (
-          <>
-            <h1 className="font-display text-3xl font-semibold tracking-tight">
-              Choose a new password
-            </h1>
-            <p className="mb-8 mt-2 text-muted">
-              Then you&apos;re back in.
-            </p>
-            <ResetForm token={token} />
-          </>
+          <ResetForm token={token} />
         ) : (
           <>
             <h1 className="font-display text-3xl font-semibold tracking-tight">

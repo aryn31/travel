@@ -16,9 +16,10 @@ export async function SiteHeader() {
           Wendfolk
         </Link>
         <nav className="flex items-center gap-1 text-sm">
-          {/* Public and first, so the archive is reachable without an
-              account -- it is the main way in for anyone not signed in. */}
-          <NavLink href="/stories">Stories</NavLink>
+          {/* Members only (app/stories/page.tsx), so it is only offered to
+              people who can actually open it. A link that always bounces to
+              a sign-in form is worse than no link. */}
+          {viewer?.profile && <NavLink href="/stories">Stories</NavLink>}
           {viewer ? (
             <>
               {viewer.profile ? (

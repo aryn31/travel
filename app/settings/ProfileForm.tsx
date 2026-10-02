@@ -7,9 +7,11 @@ import { Field, inputClass } from "@/components/ui/Field";
 import { Avatar } from "@/components/ui/Avatar";
 import { HANDLE_RULES } from "@/lib/handles";
 import { LIMITS } from "@/lib/profile";
-import { uploadAvatar } from "@/lib/upload-client";
+import { uploadAvatar, uploadCover } from "@/lib/upload-client";
+import { publicUrl } from "@/lib/media-url";
 import {
   setAvatar,
+  setCoverPhoto,
   updateProfile,
   type ProfileState,
   type ProfileValues,
@@ -18,9 +20,11 @@ import {
 export function ProfileForm({
   initial,
   initialAvatarKey,
+  initialCoverKey,
 }: {
   initial: ProfileValues;
   initialAvatarKey: string | null;
+  initialCoverKey: string | null;
 }) {
   const [state, action, pending] = useActionState<ProfileState, FormData>(
     updateProfile,
@@ -37,6 +41,24 @@ export function ProfileForm({
   const [avatarBusy, setAvatarBusy] = useState(false);
   const [avatarError, setAvatarError] = useState<string | null>(null);
   const avatarInput = useRef<HTMLInputElement>(null);
+  const [coverKey, setCoverKey] = useState(initialCoverKey);
+  const [coverBusy, setCoverBusy] = useState(false);
+  const coverInput = useRef<HTMLInputElement>(null);
+
+  async function pickCover(file: File) {
+    setAvatarError(null);
+    setCoverBusy(true);
+    try {
+      const key = await uploadCover(file);
+      const result = await setCoverPhoto(key);
+      if (!result.ok) throw new Error(result.error);
+      setCoverKey(result.coverKey);
+    } catch (err) {
+      setAvatarError(err instanceof Error ? err.message : "Could not upload that.");
+    } finally {
+      setCoverBusy(false);
+    }
+  }
   const [, startAvatarTransition] = useTransition();
 
   async function pickAvatar(file: File) {
@@ -90,6 +112,67 @@ export function ProfileForm({
             )}
           </p>
         )}
+
+        {/* Cover first, because that is the order the profile reads in. */}
+        <div className="border-b border-rule pb-7">
+          <p className="text-sm font-medium">Cover photo</p>
+          <p className="mt-0.5 text-xs text-muted">
+            A wide banner across the top of your profile. Cropped to 3:1.
+          </p>
+
+          <div className="mt-3 overflow-hidden rounded-xl border border-rule bg-surface">
+            {coverKey ? (
+              /* eslint-disable-next-line @next/next/no-img-element -- see
+                 ProfileHeader: straight from the bucket. */
+              <img
+                src={publicUrl(coverKey)}
+                alt=""
+                className="aspect-[3/1] w-full object-cover"
+              />
+            ) : (
+              <div className="flex aspect-[3/1] w-full items-center justify-center border-dashed text-sm text-faint">
+                No cover yet
+              </div>
+            )}
+          </div>
+
+          <div className="mt-2.5 flex flex-wrap items-center gap-3 text-sm">
+            <button
+              type="button"
+              onClick={() => coverInput.current?.click()}
+              disabled={coverBusy}
+              className="rounded-full border border-rule px-3.5 py-1.5 transition-colors hover:bg-surface-hover disabled:opacity-40"
+            >
+              {coverBusy ? "Uploading…" : coverKey ? "Replace" : "Upload a cover"}
+            </button>
+            {coverKey && !coverBusy && (
+              <button
+                type="button"
+                onClick={() =>
+                  startAvatarTransition(async () => {
+                    const result = await setCoverPhoto(null);
+                    if (result.ok) setCoverKey(null);
+                  })
+                }
+                className="text-muted underline underline-offset-2 transition-colors hover:text-foreground"
+              >
+                Remove
+              </button>
+            )}
+          </div>
+
+          <input
+            ref={coverInput}
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/avif"
+            hidden
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              e.target.value = "";
+              if (file) void pickCover(file);
+            }}
+          />
+        </div>
 
         {/* Outside the <form>: uploading is its own action and must not be
             able to submit the profile form by accident. */}

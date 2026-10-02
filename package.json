@@ -14,6 +14,7 @@
     "db:migrate": "drizzle-kit migrate",
     "db:generate": "drizzle-kit generate",
     "check:media": "tsx --env-file=.env.local scripts/check-media.ts",
+    "sweep:media": "NODE_OPTIONS=--conditions=react-server tsx --env-file=.env.local scripts/sweep-media.ts",
     "storage:migrate": "tsx --env-file=.env.local scripts/migrate-storage.ts",
     "storage:fixkeys": "tsx --env-file=.env.local scripts/fix-media-keys.ts",
     "photo": "tsx --env-file=.env.local scripts/photo-preview.ts"

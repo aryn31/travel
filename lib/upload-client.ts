@@ -155,3 +155,59 @@ export async function uploadAvatar(
   onProgress(1);
   return ticket.key;
 }
+
+/* A banner, not a photograph: wide, short, and never shown taller than a
+   few hundred pixels, so there is nothing to gain from storing more. */
+const COVER_WIDTH = 1600;
+const COVER_RATIO = 3; // 3:1
+
+/**
+ * Centre-crops to a wide banner and scales it down.
+ *
+ * The crop is horizontal-centre, vertical-third: a cover is usually a
+ * landscape and the interesting part of a landscape is rarely its middle
+ * row of pixels. Taking the upper third keeps horizons and skylines rather
+ * than slicing through them.
+ */
+async function bannerCrop(file: File): Promise<Blob> {
+  const bitmap = await createImageBitmap(file);
+
+  const cropH = Math.min(bitmap.height, bitmap.width / COVER_RATIO);
+  const cropW = cropH * COVER_RATIO;
+  const sx = (bitmap.width - cropW) / 2;
+  const sy = Math.min((bitmap.height - cropH) / 2, bitmap.height * 0.25);
+
+  const width = Math.min(COVER_WIDTH, Math.round(cropW));
+  const height = Math.round(width / COVER_RATIO);
+
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas unavailable");
+  ctx.drawImage(bitmap, sx, sy, cropW, cropH, 0, 0, width, height);
+  bitmap.close();
+
+  let blob = await encode(canvas, "image/webp");
+  if (!blob || blob.type !== "image/webp") blob = await encode(canvas, "image/jpeg");
+  if (!blob) throw new Error("Could not process this image");
+  return blob;
+}
+
+/** Uploads a profile banner and returns its storage key. */
+export async function uploadCover(
+  file: File,
+  onProgress: (fraction: number) => void = () => {},
+): Promise<string> {
+  if (!file.type.startsWith("image/")) throw new Error("Images only.");
+
+  onProgress(0);
+  const blob = await bannerCrop(file);
+
+  const ticket = await requestUpload(blob.type, blob.size);
+  if (!ticket.ok) throw new Error(ticket.error);
+
+  await putWithProgress(ticket.url, blob, onProgress);
+  onProgress(1);
+  return ticket.key;
+}

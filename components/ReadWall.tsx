@@ -71,8 +71,10 @@ export function ReadWall({
             {FREE_READS === 1
               ? "Signed-out visitors get one story."
               : `Signed-out visitors get ${FREE_READS} stories.`}{" "}
-            <Link href="/stories" className="underline underline-offset-2">
-              Browse the rest
+            {/* Not /stories: the archive needs an account, and sending
+                someone there from here would only bounce them back. */}
+            <Link href="/" className="underline underline-offset-2">
+              See what else is here
             </Link>{" "}
             any time.
           </p>

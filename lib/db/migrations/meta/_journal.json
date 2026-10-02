@@ -78,6 +78,27 @@
       "when": 1790875526925,
       "tag": "0010_mixed_speedball",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1790937744000,
+      "tag": "0011_open_the_professor",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1790939979627,
+      "tag": "0012_broken_quasimodo",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1790962795426,
+      "tag": "0013_nostalgic_johnny_blaze",
+      "breakpoints": true
     }
   ]
 }
