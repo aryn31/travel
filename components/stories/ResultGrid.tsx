@@ -99,7 +99,12 @@ export function ResultGrid({ results }: { results: SearchResult[] }) {
                     href={`/@${s.handle}`}
                     className="inline-flex items-center gap-2 transition-colors hover:text-foreground"
                   >
-                    <Avatar name={s.displayName} handle={s.handle} size="sm" />
+                    <Avatar
+                      name={s.displayName}
+                      handle={s.handle}
+                      avatarKey={s.avatarKey}
+                      size="sm"
+                    />
                     {s.displayName}
                   </Link>
                   {s.readingMinutes > 0 && (

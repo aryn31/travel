@@ -11,7 +11,12 @@ function Meta({ story }: { story: StoryCard }) {
         href={`/@${story.handle}`}
         className="inline-flex items-center gap-2 hover:text-foreground"
       >
-        <Avatar name={story.displayName} handle={story.handle} size="sm" />
+        <Avatar
+          name={story.displayName}
+          handle={story.handle}
+          avatarKey={story.avatarKey}
+          size="sm"
+        />
         {story.displayName}
       </Link>
       {story.readingMinutes > 0 && (

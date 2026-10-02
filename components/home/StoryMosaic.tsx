@@ -103,7 +103,12 @@ export function StoryMosaic({ stories }: { stories: StoryCard[] }) {
                   )}
 
                   <div className="mt-3 flex items-center gap-2 text-xs text-white/70">
-                    <Avatar name={s.displayName} handle={s.handle} size="sm" />
+                    <Avatar
+                      name={s.displayName}
+                      handle={s.handle}
+                      avatarKey={s.avatarKey}
+                      size="sm"
+                    />
                     <span>{s.displayName}</span>
                     {s.readingMinutes > 0 && (
                       <>

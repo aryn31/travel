@@ -33,7 +33,7 @@ export function SiteFooter() {
           <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-[1.8fr_1fr_1fr] lg:gap-16">
             <div>
               <p className="font-display text-4xl font-semibold leading-none tracking-tight sm:text-5xl">
-                Travel Stories
+                Wendfolk
               </p>
               <p className="mt-5 max-w-sm text-lg leading-relaxed text-muted">
                 Places, properly told — long-form writing about where you went

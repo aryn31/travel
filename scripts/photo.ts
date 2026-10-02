@@ -158,3 +158,80 @@ function crc32(buf: Buffer): number {
   for (const b of buf) crc = table[(crc ^ b) & 0xff] ^ (crc >>> 8);
   return crc ^ 0xffffffff;
 }
+
+/**
+ * A deterministic abstract portrait for a seeded writer.
+ *
+ * Generated rather than fetched on purpose. The seeded writers are invented
+ * people, and dressing them in real photographs of real humans from Commons
+ * would be attributing a face to someone who does not exist -- a licensing
+ * problem and a dishonesty problem at once.
+ *
+ * So: a flat-colour ground, a sun-like disc, and a horizon, all derived from
+ * the handle. It reads as a portrait at 32px because that is the only size
+ * most of them are ever seen at, and two writers never collide because the
+ * seed is their handle.
+ */
+export function avatarPng(size: number, seed: number): Buffer {
+  const rand = mulberry32(seed);
+
+  const hue = Math.floor(rand() * 360);
+  const hsl = (h: number, s: number, l: number): RGB => {
+    const a = (s * Math.min(l, 1 - l)) / 100;
+    const f = (n: number) => {
+      const k = (n + h / 30) % 12;
+      return Math.round(255 * (l - a * Math.max(-1, Math.min(k - 3, Math.min(9 - k, 1)))));
+    };
+    return [f(0), f(8), f(4)];
+  };
+
+  const sky: RGB = hsl(hue, 45, 0.78);
+  const ground: RGB = hsl((hue + 150) % 360, 38, 0.34);
+  const disc: RGB = hsl((hue + 40) % 360, 70, 0.6);
+
+  const horizon = Math.round(size * (0.58 + rand() * 0.14));
+  const discX = Math.round(size * (0.3 + rand() * 0.4));
+  const discY = Math.round(horizon * (0.42 + rand() * 0.3));
+  const discR = Math.round(size * (0.13 + rand() * 0.07));
+
+  const raw = Buffer.alloc((size * 3 + 1) * size);
+  let p = 0;
+  for (let y = 0; y < size; y++) {
+    raw[p++] = 0; // PNG filter byte: none
+    for (let x = 0; x < size; x++) {
+      let c: RGB = y < horizon ? sky : ground;
+
+      // Soft vertical gradient in the sky, so it is not a flat rectangle.
+      if (y < horizon) c = lerp(c, hsl((hue + 20) % 360, 50, 0.88), 1 - y / horizon);
+
+      const dx = x - discX;
+      const dy = y - discY;
+      if (dx * dx + dy * dy <= discR * discR) c = disc;
+
+      raw[p++] = c[0];
+      raw[p++] = c[1];
+      raw[p++] = c[2];
+    }
+  }
+
+  const chunk = (tag: string, data: Buffer) => {
+    const len = Buffer.alloc(4);
+    len.writeUInt32BE(data.length);
+    const body = Buffer.concat([Buffer.from(tag, "ascii"), data]);
+    const crc = Buffer.alloc(4);
+    crc.writeUInt32BE(crc32(body) >>> 0);
+    return Buffer.concat([len, body, crc]);
+  };
+
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(size, 0);
+  ihdr.writeUInt32BE(size, 4);
+  ihdr[8] = 8;
+  ihdr[9] = 2;
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    chunk("IHDR", ihdr),
+    chunk("IDAT", deflateSync(raw, { level: 6 })),
+    chunk("IEND", Buffer.alloc(0)),
+  ]);
+}

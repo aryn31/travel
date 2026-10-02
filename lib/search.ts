@@ -151,6 +151,7 @@ export async function searchStories(query: Query) {
       countryCode: stories.countryCode,
       handle: profiles.handle,
       displayName: profiles.displayName,
+      avatarKey: profiles.avatarKey,
       coverKey: media.storageKey,
       coverWidth: media.width,
       coverHeight: media.height,
@@ -200,6 +201,7 @@ export async function matchingWriters(query: Query) {
     .select({
       handle: profiles.handle,
       displayName: profiles.displayName,
+      avatarKey: profiles.avatarKey,
       bio: profiles.bio,
       stories: sql<number>`count(${stories.id})::int`.as("stories"),
     })
@@ -215,7 +217,7 @@ export async function matchingWriters(query: Query) {
         or ${profiles.handle} ilike ${like}
       )`,
     )
-    .groupBy(profiles.handle, profiles.displayName, profiles.bio)
+    .groupBy(profiles.handle, profiles.displayName, profiles.avatarKey, profiles.bio)
     .orderBy(sql`count(${stories.id}) desc`)
     .limit(4);
 }

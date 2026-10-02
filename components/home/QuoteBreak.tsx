@@ -18,12 +18,14 @@ export function QuoteBreak({
   href,
   authorName,
   authorHandle,
+  authorAvatarKey,
 }: {
   quote: string;
   title: string;
   href: string;
   authorName: string;
   authorHandle: string;
+  authorAvatarKey: string | null;
 }) {
   return (
     <div className="perforate relative isolate my-20 bg-sea text-background">
@@ -50,7 +52,12 @@ export function QuoteBreak({
           </p>
 
           <footer className="mt-10 flex flex-wrap items-center justify-center gap-3 text-sm">
-            <Avatar name={authorName} handle={authorHandle} size="sm" />
+            <Avatar
+              name={authorName}
+              handle={authorHandle}
+              avatarKey={authorAvatarKey}
+              size="sm"
+            />
             <Link href={`/@${authorHandle}`} className="font-semibold hover:underline">
               {authorName}
             </Link>

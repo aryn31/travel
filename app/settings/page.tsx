@@ -51,6 +51,7 @@ export default async function SettingsPage() {
             website: p.website ?? "",
             homeCountry: p.homeCountry ?? "",
           }}
+          initialAvatarKey={p.avatarKey}
         />
       </section>
 

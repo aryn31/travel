@@ -5,12 +5,13 @@
  * permalinks.
  */
 const RESERVED = new Set([
-  "about", "account", "admin", "api", "auth", "blog", "collections", "contact",
-  "dashboard", "discover", "docs", "editor", "explore", "faq", "feed", "help",
-  "home", "jobs", "legal", "login", "logout", "map", "me", "new", "news",
-  "notifications", "onboarding", "places", "press", "privacy", "profile",
-  "public", "search", "settings", "signin", "signout", "signup", "static",
-  "stories", "story", "support", "tags", "terms", "trips", "write", "www",
+  "about", "account", "admin", "api", "auth", "blog", "collections",
+  "contact", "dashboard", "discover", "docs", "editor", "explore", "faq",
+  "feed", "forgot", "help", "home", "jobs", "legal", "login", "logout",
+  "map", "me", "new", "news", "notifications", "onboarding", "places",
+  "press", "privacy", "profile", "public", "reset", "search", "settings",
+  "signin", "signout", "signup", "static", "stories", "story", "support",
+  "tags", "terms", "trips", "write", "www",
 ]);
 
 export const HANDLE_RULES =

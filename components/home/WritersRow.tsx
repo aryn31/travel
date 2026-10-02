@@ -5,6 +5,7 @@ import { flagFor } from "@/components/ui/PlaceMark";
 export type WriterCard = {
   handle: string;
   displayName: string;
+  avatarKey: string | null;
   bio: string | null;
   homeCountry: string | null;
   stories: number;
@@ -93,10 +94,7 @@ export function WritersRow({ writers }: { writers: WriterCard[] }) {
       <ul className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
         {writers.map((w, i) => {
           const hue = HUES[i % HUES.length];
-          const flags = w.countries
-            .map((c) => flagFor(c))
-            .filter(Boolean)
-            .join(" ");
+          const flags = w.countries.map((c) => flagFor(c)).filter(Boolean);
 
           return (
             <li key={w.handle}>
@@ -119,16 +117,61 @@ export function WritersRow({ writers }: { writers: WriterCard[] }) {
                   >
                     {w.stories} {w.stories === 1 ? "story" : "stories"}
                   </span>
+
+                  {/* Entry stamps, which is what the empty half of a
+                      passport page is actually for. They were crammed into
+                      the footer before, where they read as punctuation
+                      rather than as somewhere the writer has been. */}
+                  {flags.length > 0 && (
+                    <span
+                      className="absolute bottom-2.5 right-3 flex items-end gap-1"
+                      aria-label="Countries written about"
+                    >
+                      {flags.map((flag, f) => (
+                        <span
+                          key={f}
+                          aria-hidden
+                          className="inline-grid size-7 place-items-center rounded-md border border-dashed border-background/45 bg-background/10 text-sm leading-none"
+                          /* Each stamp lands at its own angle -- a row of
+                             them squared up looks printed, not stamped. */
+                          style={{ transform: `rotate(${((f * 7) % 11) - 5}deg)` }}
+                        >
+                          {flag}
+                        </span>
+                      ))}
+                    </span>
+                  )}
                 </div>
 
                 {/* The portrait straddles the edge of the colour block --
                     the one element allowed to break the card's own grid. */}
                 {/* relative, or the positioned colour block above paints
                     over it and the portrait is sliced in half. */}
-                <div className="relative -mt-10 px-5">
+                <div className="relative -mt-10 flex items-end gap-3 px-5">
                   <span className="inline-block rounded-full ring-4 ring-background">
-                    <Avatar name={w.displayName} handle={w.handle} size="lg" />
+                    <Avatar
+                      name={w.displayName}
+                      handle={w.handle}
+                      avatarKey={w.avatarKey}
+                      size="lg"
+                    />
                   </span>
+
+                  {/* Beside the portrait rather than in the body copy: this
+                      is where they write *from*, which the flags at the foot
+                      of the card answer the other half of. It had no home at
+                      all before -- homeCountry was only ever a fallback for
+                      a missing bio, so anyone with a bio never showed it. */}
+                  {w.homeCountry && (
+                    <span className="min-w-0 pb-1.5 text-xs leading-tight text-muted">
+                      <span className="block text-[0.6rem] font-semibold uppercase tracking-[0.14em] text-faint">
+                        Based in
+                      </span>
+                      <span className="block truncate font-medium text-foreground">
+                        {w.homeCountry}
+                      </span>
+                    </span>
+                  )}
                 </div>
 
                 <div className="flex flex-1 flex-col px-5 pb-5 pt-3">
@@ -139,21 +182,12 @@ export function WritersRow({ writers }: { writers: WriterCard[] }) {
                     @{w.handle}
                   </p>
                   <p className="mt-3 line-clamp-3 text-sm leading-relaxed text-muted">
-                    {w.bio?.trim() ||
-                      (w.homeCountry
-                        ? `Writing from ${w.homeCountry}.`
-                        : "Writing here.")}
+                    {w.bio?.trim() || "Writing here."}
                   </p>
 
                   <div
-                    className={`mt-auto flex items-center justify-between gap-3 border-t-2 border-dashed pt-4 ${hue.dash}`}
+                    className={`mt-auto flex items-center justify-end border-t-2 border-dashed pt-4 ${hue.dash}`}
                   >
-                    <span
-                      className="text-base leading-none"
-                      aria-label="Countries written about"
-                    >
-                      {flags || "—"}
-                    </span>
                     <span
                       aria-hidden
                       className={`text-[0.65rem] font-bold uppercase tracking-[0.16em] ${hue.text}`}

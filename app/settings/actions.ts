@@ -10,6 +10,7 @@ import { normalizeHandle } from "@/lib/handles";
 import { LIMITS, normalizeWebsite } from "@/lib/profile";
 import { checkPassword, hashPassword, verifyPassword } from "@/lib/password";
 import { revokeOtherSessions } from "@/lib/auth-session";
+import { isSafeKey, remove as removeFromStorage } from "@/lib/storage";
 import * as throttle from "@/lib/throttle";
 
 export type ProfileValues = {
@@ -173,4 +174,55 @@ export async function changePassword(
   await revokeOtherSessions(viewer.userId);
 
   return { saved: true };
+}
+
+/* ------------------------------------------------------------------ *
+ * Profile photo
+ * ------------------------------------------------------------------ */
+
+export type AvatarState = { ok: true; avatarKey: string | null } | { ok: false; error: string };
+
+/**
+ * Points the profile at an already-uploaded key, or clears it.
+ *
+ * The bytes are in place before this runs -- the browser PUT them straight
+ * to storage through a signed URL. All that is left is to say which key is
+ * mine, and the ownership check is the key's own prefix: every key is minted
+ * as `<userId>/<uuid>.<ext>`, so a key that does not start with this user's
+ * id was not issued to them.
+ */
+export async function setAvatar(avatarKey: string | null): Promise<AvatarState> {
+  const viewer = await getViewer();
+  if (!viewer) redirect("/signin");
+  if (!viewer.profile) redirect("/onboarding");
+
+  if (avatarKey !== null) {
+    if (!isSafeKey(avatarKey) || !avatarKey.startsWith(`${viewer.userId}/`)) {
+      return { ok: false, error: "That upload isn't yours." };
+    }
+  }
+
+  const previous = viewer.profile.avatarKey;
+
+  await db
+    .update(profiles)
+    .set({ avatarKey, updatedAt: new Date() })
+    .where(eq(profiles.userId, viewer.userId));
+
+  /*
+   * Delete the file the profile just stopped pointing at. Nothing else can
+   * reference it -- avatar keys never enter a story body or a media row --
+   * so a replaced photo left behind is storage nobody will ever reclaim.
+   * Failure here is not worth failing the save for.
+   */
+  if (previous && previous !== avatarKey) {
+    try {
+      await removeFromStorage(previous);
+    } catch {
+      /* the row is already updated; an orphaned file is the lesser problem */
+    }
+  }
+
+  revalidatePath("/", "layout");
+  return { ok: true, avatarKey };
 }

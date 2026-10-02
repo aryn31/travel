@@ -10,6 +10,7 @@ import { getViewer } from "@/lib/session";
 import { slugForTitle } from "@/lib/stories";
 import { docToSummary, docToText, isDoc, readingMinutes } from "@/lib/story-doc";
 import { remove as removeFromStorage } from "@/lib/storage";
+import { isCountryCode } from "@/lib/countries";
 
 /**
  * Every mutation goes through this. Ownership is checked against the session
@@ -53,10 +54,13 @@ const MAX_DOC_BYTES = 1_000_000;
 
 export type SaveResult = { ok: true; savedAt: number } | { ok: false; error: string };
 
+export type SavePlace = { placeName: string; countryCode: string };
+
 export async function saveStory(
   storyId: string,
   title: string,
   doc: unknown,
+  place?: SavePlace,
 ): Promise<SaveResult> {
   const story = await requireOwnStory(storyId);
 
@@ -75,6 +79,19 @@ export async function saveStory(
   const cleanTitle = title.slice(0, 200);
   const text = docToText(doc);
 
+  /*
+   * Place feeds three things: the chip on the card, the country filter on
+   * /stories, and the weight-A half of the search vector. An unknown country
+   * code is dropped rather than rejected -- it is a select on the client, so
+   * a bad value means something tampered, and failing the whole save would
+   * cost the author their paragraph to punish a field they cannot see.
+   */
+  const placeName = place?.placeName.trim().slice(0, 120) || null;
+  const countryCode =
+    place?.countryCode && isCountryCode(place.countryCode)
+      ? place.countryCode.toUpperCase()
+      : null;
+
   // A published story keeps its slug. Re-slugging on a title tweak would
   // silently break every link already pointing at it (PLAN.md 4.1).
   const slug =
@@ -91,6 +108,8 @@ export async function saveStory(
       bodyText: text,
       excerpt: docToSummary(doc),
       readingMinutes: readingMinutes(text),
+      placeName,
+      countryCode,
       updatedAt: new Date(),
     })
     .where(eq(stories.id, story.id));

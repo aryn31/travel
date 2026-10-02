@@ -94,8 +94,18 @@ export const profiles = pgTable(
       .references(() => users.id, { onDelete: "cascade" }),
     handle: text("handle").notNull(),
     displayName: text("display_name").notNull(),
-    avatarUrl: text("avatar_url"),
     bio: text("bio"),
+    /*
+     * A storage key, not a URL -- PLAN.md 4.5. It replaces avatar_url, which
+     * was declared at the start and never written to; a URL frozen into a
+     * row is a provider decision you cannot take back, which is the trap the
+     * image move walked into.
+     *
+     * Kept on the profile rather than joined through `media` like a story
+     * cover: avatars render in eleven places, and a join at each one costs
+     * far more than a column.
+     */
+    avatarKey: text("avatar_key"),
     website: text("website"),
     homeCountry: text("home_country"),
 
@@ -123,6 +133,33 @@ export const profiles = pgTable(
 );
 
 export type Profile = typeof profiles.$inferSelect;
+
+/**
+ * Password reset links.
+ *
+ * Separate from Auth.js's `verification_tokens`: that table is the adapter's
+ * and holds sign-in links, and overloading it would mean a reset link and a
+ * sign-in link becoming interchangeable -- a reset link would log you in,
+ * which is not what it is for.
+ *
+ * Only the SHA-256 of the token is stored. The plaintext exists in the email
+ * and nowhere else, so a leaked database does not hand anyone the ability to
+ * take over accounts. Used tokens are deleted rather than flagged: one use,
+ * then gone.
+ */
+export const passwordResetTokens = pgTable(
+  "password_reset_tokens",
+  {
+    tokenHash: text("token_hash").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    expires: timestamp("expires", { mode: "date" }).notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  // Issuing a new link invalidates the old ones, which needs this lookup.
+  (t) => [index("password_reset_user_idx").on(t.userId)],
+);
 
 export const storyStatus = pgEnum("story_status", [
   "draft",

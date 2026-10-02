@@ -1,5 +1,20 @@
 @import "tailwindcss";
 
+/*
+ * Point Tailwind's `dark:` variant at the site's own theme attribute.
+ *
+ * By default it compiles to a prefers-color-scheme media query, which is the
+ * operating system's preference -- not the toggle in the header. With an OS
+ * set to dark and the site set to light, every dark: class fired anyway:
+ * error text, the search highlight, the destination chips and the avatar
+ * paper all rendered their dark variant on a light page.
+ *
+ * Everything else here themes through custom properties under
+ * :root[data-theme="dark"], so this just brings the one Tailwind mechanism
+ * into line with the rest.
+ */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
 :root {
   color-scheme: light;
 
@@ -519,6 +534,11 @@ body,
 
 .font-display {
   font-family: var(--font-display), ui-serif, Georgia, serif;
+}
+
+/* Used only by the avatar fallback: initials written rather than set. */
+.font-signature {
+  font-family: var(--font-signature), "Segoe Script", cursive;
 }
 
 /* Small caps-ish label used for section headers and eyebrows. */

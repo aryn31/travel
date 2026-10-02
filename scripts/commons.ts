@@ -8,7 +8,7 @@
  */
 
 const API = "https://commons.wikimedia.org/w/api.php";
-const UA = "TravelStoriesSeed/1.0 (local development seed script)";
+const UA = "WendfolkSeed/1.0 (local development seed script)";
 
 /**
  * Commons rate-limits hard, and an unthrottled seed run gets 429s after

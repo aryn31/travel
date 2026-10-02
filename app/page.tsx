@@ -34,6 +34,7 @@ export default async function Home() {
       countryCode: stories.countryCode,
       handle: profiles.handle,
       displayName: profiles.displayName,
+      avatarKey: profiles.avatarKey,
       coverKey: media.storageKey,
       coverWidth: media.width,
       coverHeight: media.height,
@@ -69,6 +70,7 @@ export default async function Home() {
     .select({
       handle: profiles.handle,
       displayName: profiles.displayName,
+      avatarKey: profiles.avatarKey,
       bio: profiles.bio,
       homeCountry: profiles.homeCountry,
       stories: sql<number>`count(${stories.id})::int`.as("stories"),
@@ -81,7 +83,13 @@ export default async function Home() {
       stories,
       sql`${stories.authorId} = ${profiles.userId} and ${stories.status} = 'published'`,
     )
-    .groupBy(profiles.handle, profiles.displayName, profiles.bio, profiles.homeCountry)
+    .groupBy(
+      profiles.handle,
+      profiles.displayName,
+      profiles.avatarKey,
+      profiles.bio,
+      profiles.homeCountry,
+    )
     .orderBy(desc(sql`count(${stories.id})`))
     .limit(4);
 
@@ -205,6 +213,7 @@ export default async function Home() {
                   href={`/@${quoted.handle}/${quoted.slug}`}
                   authorName={quoted.displayName}
                   authorHandle={quoted.handle}
+                  authorAvatarKey={quoted.avatarKey}
                 />
                 </Reveal>
               </div>

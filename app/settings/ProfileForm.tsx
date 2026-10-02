@@ -1,19 +1,27 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useState } from "react";
+import { useActionState, useRef, useState, useTransition } from "react";
 import { Button } from "@/components/ui/Button";
 import { Field, inputClass } from "@/components/ui/Field";
 import { Avatar } from "@/components/ui/Avatar";
 import { HANDLE_RULES } from "@/lib/handles";
 import { LIMITS } from "@/lib/profile";
+import { uploadAvatar } from "@/lib/upload-client";
 import {
+  setAvatar,
   updateProfile,
   type ProfileState,
   type ProfileValues,
 } from "./actions";
 
-export function ProfileForm({ initial }: { initial: ProfileValues }) {
+export function ProfileForm({
+  initial,
+  initialAvatarKey,
+}: {
+  initial: ProfileValues;
+  initialAvatarKey: string | null;
+}) {
   const [state, action, pending] = useActionState<ProfileState, FormData>(
     updateProfile,
     {},
@@ -25,6 +33,26 @@ export function ProfileForm({ initial }: { initial: ProfileValues }) {
    * uncontrolled version of this to fall back on.
    */
   const [values, setValues] = useState<ProfileValues>(initial);
+  const [avatarKey, setAvatarKey] = useState(initialAvatarKey);
+  const [avatarBusy, setAvatarBusy] = useState(false);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
+  const avatarInput = useRef<HTMLInputElement>(null);
+  const [, startAvatarTransition] = useTransition();
+
+  async function pickAvatar(file: File) {
+    setAvatarError(null);
+    setAvatarBusy(true);
+    try {
+      const key = await uploadAvatar(file);
+      const result = await setAvatar(key);
+      if (!result.ok) throw new Error(result.error);
+      setAvatarKey(result.avatarKey);
+    } catch (err) {
+      setAvatarError(err instanceof Error ? err.message : "Could not upload that.");
+    } finally {
+      setAvatarBusy(false);
+    }
+  }
   const set = (k: keyof ProfileValues) => (v: string) =>
     setValues((prev) => ({ ...prev, [k]: v }));
 
@@ -62,6 +90,65 @@ export function ProfileForm({ initial }: { initial: ProfileValues }) {
             )}
           </p>
         )}
+
+        {/* Outside the <form>: uploading is its own action and must not be
+            able to submit the profile form by accident. */}
+        <div className="flex flex-wrap items-center gap-5 border-b border-rule pb-7">
+          <Avatar
+            key={avatarKey ?? "none"}
+            name={values.displayName || "?"}
+            handle={handlePreview}
+            avatarKey={avatarKey}
+            size="lg"
+          />
+          <div>
+            <p className="text-sm font-medium">Profile photo</p>
+            <p className="mt-0.5 text-xs text-muted">
+              Square, cropped from the middle. JPEG, PNG or WebP.
+            </p>
+            <div className="mt-2.5 flex flex-wrap items-center gap-3 text-sm">
+              <button
+                type="button"
+                onClick={() => avatarInput.current?.click()}
+                disabled={avatarBusy}
+                className="rounded-full border border-rule px-3.5 py-1.5 transition-colors hover:bg-surface-hover disabled:opacity-40"
+              >
+                {avatarBusy ? "Uploading…" : avatarKey ? "Replace" : "Upload a photo"}
+              </button>
+              {avatarKey && !avatarBusy && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    startAvatarTransition(async () => {
+                      const result = await setAvatar(null);
+                      if (result.ok) setAvatarKey(null);
+                    })
+                  }
+                  className="text-muted underline underline-offset-2 transition-colors hover:text-foreground"
+                >
+                  Remove
+                </button>
+              )}
+            </div>
+            {avatarError && (
+              <p role="alert" className="mt-2 text-sm text-red-600 dark:text-red-400">
+                {avatarError}
+              </p>
+            )}
+          </div>
+
+          <input
+            ref={avatarInput}
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/avif"
+            hidden
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              e.target.value = "";
+              if (file) void pickAvatar(file);
+            }}
+          />
+        </div>
 
         <Field
           label="Display name"
@@ -198,9 +285,10 @@ export function ProfileForm({ initial }: { initial: ProfileValues }) {
               {/* Keyed on the handle: the tint is derived from it, so the
                   preview has to re-derive as it changes. */}
               <Avatar
-                key={handlePreview}
+                key={handlePreview + (avatarKey ?? "")}
                 name={values.displayName || "?"}
                 handle={handlePreview}
+                avatarKey={avatarKey}
                 size="lg"
               />
               <div className="min-w-0">

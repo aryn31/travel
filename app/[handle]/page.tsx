@@ -29,7 +29,7 @@ export async function generateMetadata({ params }: PageProps<"/[handle]">) {
   if (!profile) return {};
   return {
     title: profile.displayName,
-    description: profile.bio ?? `Travel stories by @${profile.handle}.`,
+    description: profile.bio ?? `Travel stories by @${profile.handle} on Wendfolk.`,
   };
 }
 
@@ -60,6 +60,7 @@ export default async function ProfilePage({ params }: PageProps<"/[handle]">) {
       publishedAt: stories.publishedAt,
       handle: profiles.handle,
       displayName: profiles.displayName,
+      avatarKey: profiles.avatarKey,
       coverKey: media.storageKey,
       coverWidth: media.width,
       coverHeight: media.height,
@@ -88,7 +89,12 @@ export default async function ProfilePage({ params }: PageProps<"/[handle]">) {
         <div className="page py-12 sm:py-16">
           <div className="flex flex-wrap items-start justify-between gap-6">
             <div className="flex items-center gap-5">
-              <Avatar name={profile.displayName} handle={profile.handle} size="lg" />
+              <Avatar
+                name={profile.displayName}
+                handle={profile.handle}
+                avatarKey={profile.avatarKey}
+                size="lg"
+              />
               <div className="min-w-0">
                 <h1 className="font-display text-4xl font-semibold tracking-tight">
                   {profile.displayName}

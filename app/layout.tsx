@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Fraunces, Geist, Geist_Mono } from "next/font/google";
+import { Caveat, Fraunces, Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
@@ -26,11 +26,25 @@ const fraunces = Fraunces({
   axes: ["SOFT", "WONK", "opsz"],
 });
 
+/**
+ * Stands in for a profile photo: initials written rather than set.
+ *
+ * Caveat over a copperplate script like Mrs Saint Delafield -- those look
+ * more like a signature but are drawn with hairlines that disappear
+ * entirely at the 32px an avatar is usually seen at. Caveat was designed to
+ * stay legible small, which is the whole requirement here.
+ */
+const caveat = Caveat({
+  variable: "--font-signature",
+  subsets: ["latin"],
+  weight: ["600"],
+});
+
 export const metadata: Metadata = {
   // Without this, Open Graph image URLs stay relative and every social
   // scraper drops them -- shared links render with no image at all.
   metadataBase: new URL(process.env.AUTH_URL ?? "http://localhost:3000"),
-  title: { default: "Travel Stories", template: "%s · Travel Stories" },
+  title: { default: "Wendfolk", template: "%s · Wendfolk" },
   description: "Long-form travel stories, told properly.",
 };
 
@@ -41,7 +55,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       // The theme script writes data-theme before React hydrates, so the
       // server markup and the client will differ on this one attribute.
       suppressHydrationWarning
-      className={`${geistSans.variable} ${geistMono.variable} ${fraunces.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${fraunces.variable} ${caveat.variable} h-full antialiased`}
     >
       {/* pt-16 clears the fixed header on every page; the home hero cancels
           it with -mt-16 so the landscape runs behind the header. */}

@@ -13,6 +13,7 @@ export type StoryCard = {
   publishedAt: Date | null;
   handle: string;
   displayName: string;
+  avatarKey: string | null;
   placeName: string | null;
   countryCode: string | null;
   cover: { url: string; width: number; height: number } | null;
@@ -27,7 +28,12 @@ function Byline({ story, showAuthor }: { story: StoryCard; showAuthor: boolean }
             href={`/@${story.handle}`}
             className="inline-flex items-center gap-2 transition-colors hover:text-foreground"
           >
-            <Avatar name={story.displayName} handle={story.handle} size="sm" />
+            <Avatar
+              name={story.displayName}
+              handle={story.handle}
+              avatarKey={story.avatarKey}
+              size="sm"
+            />
             {story.displayName}
           </Link>
           <span aria-hidden className="text-faint">·</span>

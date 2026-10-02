@@ -1,4 +1,4 @@
-# Travel Stories Platform — Build Plan
+# Wendfolk — Build Plan
 
 **Stack:** Next.js 16 (App Router, TS) · Postgres · Drizzle · Vercel
 **Approach:** lean MVP in ~5 weeks, then layer community + maps
@@ -101,7 +101,13 @@ means you sanitize forever and can never change how an image block looks.
 Maintain `body_text` on every save for search and excerpts.
 
 **4.3 Images never pass through the Next.js server — in either direction**
-*Upload:* browser gets a presigned URL → uploads straight to Cloudflare R2 →
+*Achieved 2026-10-01 for upload, not yet for serve.* Substitute "Supabase
+Storage" for "R2" throughout — the shape is identical, and the bucket is
+reached by a real presigned PUT, so this is now true rather than imitated.
+What is still missing is the CDN half: images are served straight from
+`<ref>.supabase.co`, with no custom domain and no cache in front (§10.6).
+
+*Upload:* browser gets a presigned URL → uploads straight to the bucket →
 posts back the key plus dimensions. Serverless request body limits make the
 naive path fail on exactly the 12MP photos travel writers upload. Store
 width/height and a blurhash so the reading page has zero layout shift.
@@ -119,6 +125,12 @@ and makes the phase-2 `places` table a backfill instead of a rewrite. Populate
 lat/lng even though nothing renders it yet.
 
 **4.5 Run entirely locally, but stay deploy-ready**
+*Superseded 2026-10-01: Postgres and images now live in Supabase. Still no
+hosting and no domain — the app runs locally against hosted services. The
+reasoning below is kept because it is why that switch cost almost nothing,
+and the local drivers still work: `STORAGE_DRIVER=local` plus the Docker
+container is a complete offline fallback.*
+
 No hosting, no domain, no cloud accounts for now. The one rule that keeps that
 from becoming a trap: **every external dependency sits behind a small
 interface with a local implementation.** Three of them matter.
@@ -135,6 +147,24 @@ the R2 version hands back a presigned S3 URL. The editor code never learns
 which one it's talking to, so the upload flow you build today is the one that
 ships. Everything configured through env vars, nothing reading `process.cwd()`
 outside that one file.
+
+*Tested 2026-10-01 — both seams were used for real, and the result was
+lopsided.* Postgres moved to Supabase on a single env var: no code change at
+all, because `lib/db/index.ts` already passed `prepare: false` for a pooler
+it had never met. Storage moved on a new driver behind `STORAGE_DRIVER` and
+`lib/upload-client.ts` needed **zero** changes — it already PUT the blob to
+whatever URL it was handed, which is exactly what the interface promised.
+
+What the interface did *not* protect was everything holding a URL rather
+than a key. `components/StoryBody.tsx` gated image rendering on
+`src.startsWith("/api/media/")`, so flipping the driver would have silently
+emptied every story of its photographs, and 18 image nodes had
+`/api/media/<key>` baked into `body_json` at insert time. The fix — resolve
+any `src` back to its key and regenerate the URL — is what the interface
+should have required from the start.
+
+**The lesson worth carrying: store keys, never URLs.** A key survives a
+change of provider; a URL is a decision frozen into your data.
 
 ---
 
@@ -182,6 +212,17 @@ document as a strict allow-list — unknown nodes, `javascript:`/`data:` hrefs a
 non-local image sources are dropped, and surviving links get
 `rel="noopener noreferrer nofollow ugc"`. Blurhash deferred; intrinsic
 width/height already prevent layout shift, which was the point of it.
+
+*Updated 2026-10-01:* the disk driver now has a Supabase sibling behind
+`STORAGE_DRIVER`, spoken to over the Storage REST API rather than
+`@supabase/supabase-js` — that package bundles realtime, auth and postgrest
+clients this app does not use, and the four calls are the whole surface.
+Uploads are a real presigned PUT, so the hand-rolled HMAC is now only the
+local driver's imitation of it. The strict renderer described above was also
+the thing that nearly broke: it gated images on `src.startsWith("/api/media/")`,
+which would have silently emptied every story the moment the driver changed.
+It now resolves any `src` back to a storage key and regenerates the URL —
+a stricter allow-list, and one that survives the next move too.
 
 **Week 3 — reading and identity**
 Reading page typography, author byline card, reading time, share + OG image via
@@ -285,16 +326,53 @@ Roughly in value order:
 
 ---
 
-## 8. Image cost model — for when you deploy
+## 8. Image cost model
 
-**Right now this is all $0:** local Postgres and local disk storage cost
-nothing, and §4.5's storage interface means none of the below changes a line of
-application code when you switch. Recorded here so the decision is already made
-when you need it.
+> **Decided 2026-10-01: images live in Supabase Storage.** Postgres moved
+> there the same day. The R2 analysis below is kept because it is still the
+> cheaper answer at scale and the comparison is what makes the Supabase
+> numbers legible — but it describes the road not taken.
+
+### 8.0 What is actually running
+
+| Concern | Where | Free tier | Currently |
+| --- | --- | --- | --- |
+| Postgres | Supabase, ap-northeast-1 | 500 MB, pauses after ~7 days idle | 8.5 MB |
+| Images | Supabase Storage, public bucket `story-images` | 1 GB stored, ~2 GB egress/month | 21 MB, 36 objects |
+
+Storage is nowhere near the limit and will not be for a long time. **Egress
+is the line that moves**, because it scales with readers rather than with
+how much you host, and a travel site is almost entirely outbound
+photographs. At roughly 400 KB a photo and 8 photos a story, 2 GB/month is
+on the order of 600 story views. That is the number to watch, not the 1 GB.
+
+Two free-tier behaviours that are not cost but will feel like faults:
+
+- **The project pauses after about a week of inactivity** and needs a manual
+  restore from the dashboard. This project is worked on in bursts, so expect
+  it. Unlike the Docker container it replaced, you cannot fix it locally.
+- **Direct connections (`db.<ref>.supabase.co`) are IPv6-only** on the free
+  tier; IPv4 is a paid add-on. On a machine without an IPv6 route, *all*
+  traffic including migrations has to go through the pooler. Port 5432 on
+  the pooler is session mode, which carries DDL and transactions; port 6543
+  is transaction mode and does not. `drizzle.config.ts` prefers `DIRECT_URL`
+  for exactly this reason — set it when a real direct connection exists.
+
+### 8.1 The R2 comparison — still the cheaper answer at scale
+
+**Both options are $0 today.** §4.5's storage interface means switching is a
+driver, not a rewrite. Recorded so the decision is already made when the
+numbers start to matter.
 
 Storage is not the cost. Per-view processing and delivery are, and they scale
 with traffic rather than with how many stories you host.
 *Prices verified 2026-09-29 — re-check before committing.*
+
+**The one number that decides it: Supabase Storage charges for egress beyond
+the free allowance; R2 charges $0 for egress, always.** On a site whose
+payload is photographs, that is the whole comparison. Supabase is fine while
+traffic is small and keeps everything in one dashboard; the day egress
+becomes the bill, move the bytes and keep the database.
 
 **Cloudflare R2** — $0.015/GB-month, free tier 10 GB-month. Class A ops
 (uploads) $4.50/M with 1M/month free; Class B (origin reads on CDN miss)
@@ -360,7 +438,7 @@ volumes: { pgdata: }
 
 ```bash
 docker compose up -d
-echo 'DATABASE_URL=postgres://postgres:dev@localhost:5432/travel' >> .env.local
+echo 'DATABASE_URL=postgres://postgres:dev@localhost:5433/travel' >> .env.local
 echo 'AUTH_SECRET='$(openssl rand -base64 32) >> .env.local
 echo 'STORAGE_DRIVER=local' >> .env.local
 npx drizzle-kit generate && npx drizzle-kit migrate
@@ -371,6 +449,65 @@ Hold off on `@aws-sdk/client-s3` until you actually wire R2 — the local storag
 driver needs no dependencies. Add `/storage/` to `.gitignore`, and
 `git init` this directory so the schema history is tracked from the first
 migration.
+
+### 9.1 Running against Supabase (what is configured now)
+
+Docker is no longer needed to run the app — only as a Postgres *client*
+(`docker exec travel-db psql …`) if `libpq` is not installed, and as the
+rollback copy of the pre-migration database. `npm run dev` is the whole
+startup.
+
+```bash
+# .env.local — none of this is committed; .gitignore has a blanket .env*
+DATABASE_URL=…pooler.supabase.com:5432/postgres   # session mode: carries DDL
+# DIRECT_URL=…                                     # only if IPv4 direct exists
+STORAGE_DRIVER=supabase
+SUPABASE_SERVICE_ROLE_KEY=…                        # server-only, never prefixed
+NEXT_PUBLIC_SUPABASE_URL=https://<ref>.supabase.co
+NEXT_PUBLIC_SUPABASE_BUCKET=story-images
+```
+
+The two `NEXT_PUBLIC_` values exist because `components/StoryBody.tsx` is
+imported by the editor, so the renderer is bundled into the browser and
+needs the project URL and bucket name to validate image sources. Neither is
+secret — both appear in every image URL. The service_role key is read in
+`lib/storage.ts` and nowhere else.
+
+**Percent-encode the database password.** A literal `%` in a connection URL
+is read as a broken escape and `libpq` refuses the whole string — it fails
+at connect time, not at parse time, so it looks like a network problem.
+
+**Moving data between the two:**
+
+```bash
+docker exec travel-db pg_dump -U postgres -d travel -Fc > travel-backup.dump
+docker exec travel-db pg_dump -U postgres -d travel \
+  --data-only --no-owner --no-privileges --exclude-schema=drizzle > data.sql
+docker exec -i travel-db psql "<url>" -v ON_ERROR_STOP=1 < data.sql
+```
+
+`--exclude-schema=drizzle`, not `--exclude-table=__drizzle_migrations`: that
+table lives in its own schema, so the unqualified form matches nothing and
+the restore dies on a duplicate key. `ON_ERROR_STOP=1` is what makes that a
+clean failure instead of a half-loaded database that looks fine. Dumps are
+gitignored (`*.dump`) — they hold password hashes and live session tokens.
+
+**Storage commands** (both idempotent, both take `--dry-run`):
+
+```bash
+npm run storage:migrate    # copy ./storage into the bucket; keys unchanged
+npm run storage:fixkeys    # rename keys whose extension lies about contents
+```
+
+The second exists because **Supabase derives `Content-Type` from the file
+extension and ignores the upload header** — verified by delete-and-reinsert.
+A PNG under a `.webp` key is served as `image/webp` forever, and browsers
+sniff and render it anyway, which is why it goes unnoticed.
+
+**Destructive scripts are guarded.** `seed`, `seed:wipe` and `seed:auth`
+refuse to run unless `DATABASE_URL` is localhost (`scripts/guard.ts`). The
+command that deletes every seeded account is identical whether it points at
+a container or a hosted database; `I_MEAN_IT=yes` overrides, per run.
 
 ---
 
@@ -400,8 +537,8 @@ that true.
 | --- | --- | --- | --- |
 | Domain registrar | the domain | ~$10–15/year | Buy before picking a brand name |
 | Cloudflare | DNS + image transformations | Free | Transformations: 5,000/month free |
-| Cloudflare R2 | image storage | $0 (10 GB free) | Needs bucket CORS for browser uploads |
-| Neon *or* Supabase | Postgres | see below | see 10.3 |
+| ~~Cloudflare R2~~ | ~~image storage~~ | — | **Not used — Supabase Storage instead (§8)** |
+| **Supabase** ✅ | Postgres **and** images | $0 now | **Read §10.3a before anything else** |
 | Resend | magic-link + notification email | $0 → $20 | see 10.4 |
 | Google Cloud Console | Google sign-in | Free | see 10.5 |
 | Sentry | error tracking | Free tier | — |
@@ -409,6 +546,59 @@ that true.
 | Vercel | hosting (managed path) | $20/mo Pro | Hobby is non-commercial only |
 
 ### 10.3 Postgres — don't ship on the free tier
+
+> **Decided 2026-10-01: Supabase.** The Neon analysis below still stands as
+> the comparison, and its conclusion is unchanged by the choice of provider:
+> *do not launch on a free tier.* Supabase Free is 500 MB and pauses after
+> ~7 days idle — fine for building, not for readers. Price the paid tier
+> before opening signups, and read §10.3a first, because it is the part that
+> nearly went wrong.
+
+### 10.3a Supabase exposes your tables over HTTP by default
+
+The single most important thing on this page.
+
+Supabase serves the `public` schema over an auto-generated REST API
+(PostgREST) using the **anon key** — a key that is public by design and
+meant to be shipped inside browser JavaScript. What makes that safe is
+row-level security. Tables created through the dashboard get RLS enabled;
+**tables created by raw SQL migrations — which is all of ours — do not.**
+
+Measured on this project immediately after the move:
+
+```
+RLS:    every table  rls=false
+Grants: anon  →  SELECT, INSERT, UPDATE, DELETE, TRUNCATE  on all 7 tables
+```
+
+Not merely readable. With nothing but the public anon key, that API would
+have served `users.password_hash`, served live tokens out of `sessions` —
+which *are* the credential, not a pointer to one: paste one into a cookie
+and you are that person, no password involved — and truncated `stories`.
+
+Fixed in migration `0007_lock_out_postgrest.sql`, which does both halves for
+every table:
+
+```sql
+REVOKE ALL ON public.<table> FROM anon, authenticated;
+ALTER TABLE public.<table> ENABLE ROW LEVEL SECURITY;
+```
+
+The `REVOKE` is the fix. The `ENABLE ROW LEVEL SECURITY` is what keeps it
+fixed: Supabase's `ALTER DEFAULT PRIVILEGES` re-grants on tables created
+later, and RLS with no policies denies by default, so a future table stays
+shut even if the grant comes back. Neither affects the database owner the
+app connects as — but verify that rather than assume it, because **RLS fails
+closed**, and a page that renders nothing returns the same 200 as a page
+that works. Check a write, not just a page load.
+
+It is a migration rather than dashboard clicks so the fix travels with the
+repo and a fresh project inherits it, guarded on the `anon` role existing so
+it is a no-op against local Postgres.
+
+Still to do by hand, because it is not visible from the database: **API
+Settings → Exposed schemas**. Removing `public` there is an independent
+third layer.
 
 Neon Free is **0.5 GB storage per project** (plenty — stories are text) but it
 **scales to zero after 5 minutes and that cannot be disabled**, so the first
@@ -444,10 +634,14 @@ security review, but do this two weeks before you need it, not the night before.
 
 ### 10.6 Code that does not exist yet
 
-- [ ] R2 driver for `lib/storage.ts` — presigned `PUT`, plus bucket CORS
-      allowing your origin
-- [ ] Cloudflare custom domain in front of the bucket + a custom `next/image`
-      loader pointing at it (§4.3 — keeps image bytes off Vercel's CDN)
+- [x] ~~R2 driver for `lib/storage.ts`~~ — **done as a Supabase driver**
+      (`STORAGE_DRIVER=supabase`). Real presigned `PUT`, so the browser
+      uploads straight to the bucket and the bytes never touch this server.
+      No bucket CORS config was needed.
+- [ ] A CDN/custom domain in front of the bucket, so image URLs are not tied
+      to `<ref>.supabase.co` and egress can be fronted by a cache (§4.3, §8)
+- [ ] Password reset by email — there is none. With no mail provider, the
+      magic link **is** the only account recovery that exists (§10.4)
 - [ ] Resend adapter for Auth.js, and an actual HTML magic-link email
 - [ ] Google provider + callback URLs for prod *and* preview origins
 - [ ] `AUTH_SECRET`, `AUTH_URL`, `AUTH_TRUST_HOST` set in host env
@@ -458,7 +652,10 @@ security review, but do this two weeks before you need it, not the night before.
 - [ ] `robots.txt`, `sitemap.xml` (published stories only), canonical URLs,
       `noindex` on drafts and unlisted stories
 - [ ] Rate limiting with a **shared** store — in-memory counters are per-instance
-      and therefore fake. A Postgres table is fine; Upstash Redis if you prefer.
+      and therefore fake. `lib/throttle.ts` is exactly this: correct for one
+      process, wrong the moment there are two. A Postgres table is fine;
+      Upstash Redis if you prefer.
+- [ ] Supabase **API Settings → Exposed schemas**: remove `public` (§10.3a)
 - [ ] Sentry init (server + client) and source-map upload
 - [ ] `/api/health` that actually checks the DB, for uptime monitoring
 
@@ -501,8 +698,8 @@ worth getting a human to read.
 | Item | Managed | VPS |
 | --- | --- | --- |
 | Hosting | $20 (Vercel Pro) | $6–12 |
-| Postgres | ~$19 (Neon Launch) | included |
-| R2 storage | $0 | $0 |
+| Postgres | ~$25 (Supabase Pro) | included |
+| Image storage | $0 (inside Supabase Pro) | $0 |
 | Image transformations | $0–8 | $0–8 |
 | Email | $0 → $20 | $0 → $20 |
 | Domain | ~$1 | ~$1 |
@@ -510,4 +707,10 @@ worth getting a human to read.
 
 Traffic-independent and boring, which is the goal. The number only moves when
 you get popular enough to enjoy paying it.
+
+One caveat now that images live in Supabase rather than R2: **egress is not
+traffic-independent.** R2's $0 egress is what made that row flat. Supabase
+bundles an allowance and charges past it, so on a photo-heavy site the image
+line grows with readers. Put a CDN in front of the bucket (§10.6) before
+that matters, or move the bytes to R2 and keep the database where it is.
 

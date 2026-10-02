@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { media, stories } from "@/lib/db/schema";
 import { getViewer } from "@/lib/session";
 import { publicUrl } from "@/lib/storage";
+import { countries } from "@/lib/countries";
 import { Editor } from "./Editor";
 
 export const metadata = { title: "Write" };
@@ -38,6 +39,9 @@ export default async function WritePage({ params }: PageProps<"/write/[id]">) {
       initialCover={
         cover ? { id: cover.id, url: publicUrl(cover.storageKey) } : null
       }
+      initialPlace={story.placeName ?? ""}
+      initialCountry={story.countryCode ?? ""}
+      countryList={countries()}
     />
   );
 }

@@ -12,8 +12,8 @@ export async function SiteHeader() {
   return (
     <HeaderShell>
       <div className="page flex items-center justify-between py-4">
-        <Link href="/" className="font-display text-lg font-semibold tracking-tight">
-          Travel Stories
+        <Link href="/" className="font-display text-2xl font-semibold tracking-tight">
+          Wendfolk
         </Link>
         <nav className="flex items-center gap-1 text-sm">
           {/* Public and first, so the archive is reachable without an
@@ -29,6 +29,7 @@ export async function SiteHeader() {
                     <Avatar
                       name={viewer.profile.displayName}
                       handle={viewer.profile.handle}
+                      avatarKey={viewer.profile.avatarKey}
                       size="sm"
                     />
                     <span className="hidden sm:inline">

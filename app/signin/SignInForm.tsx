@@ -82,14 +82,20 @@ function PasswordForm({ next, onUseLink }: { next: string; onUseLink: () => void
       </Button>
 
       <div className="flex flex-col gap-3 border-t border-rule pt-5 text-sm">
-        <button
-          type="button"
-          onClick={onUseLink}
-          className={`text-left transition-colors hover:text-foreground ${
+        <Link
+          href="/forgot"
+          className={`transition-colors hover:text-foreground ${
             state.useLink ? "font-medium text-accent" : "text-muted"
           }`}
         >
-          Forgot it? Email me a sign-in link instead →
+          Forgot your password? →
+        </Link>
+        <button
+          type="button"
+          onClick={onUseLink}
+          className="text-left text-muted transition-colors hover:text-foreground"
+        >
+          Or email me a sign-in link instead →
         </button>
         <p className="text-muted">
           No account?{" "}

@@ -97,3 +97,61 @@ export async function uploadImage(
   onProgress(1);
   return saved;
 }
+
+/** Avatars are square and small; a 2560px portrait would be absurd. */
+const AVATAR_EDGE = 512;
+
+/**
+ * Centre-crops to a square, then scales to 512px.
+ *
+ * Cropping in the browser rather than with CSS `object-fit` means the stored
+ * file is the size it looks: a 12MP phone photo becomes ~40KB instead of
+ * being downloaded in full and then squeezed into a 32px circle eleven times
+ * a page.
+ */
+async function squareCrop(file: File): Promise<{ blob: Blob; size: number }> {
+  const bitmap = await createImageBitmap(file);
+  const edge = Math.min(bitmap.width, bitmap.height);
+  const sx = (bitmap.width - edge) / 2;
+  const sy = (bitmap.height - edge) / 2;
+  const size = Math.min(AVATAR_EDGE, edge);
+
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas unavailable");
+  ctx.drawImage(bitmap, sx, sy, edge, edge, 0, 0, size, size);
+  bitmap.close();
+
+  let blob = await encode(canvas, "image/webp");
+  if (!blob || blob.type !== "image/webp") blob = await encode(canvas, "image/jpeg");
+  if (!blob) throw new Error("Could not process this image");
+
+  return { blob, size };
+}
+
+/**
+ * Uploads a profile photo and returns its storage key.
+ *
+ * Goes through the same signed-upload path as story images -- same size cap,
+ * same allow-list, same driver -- but finishes by writing the key onto the
+ * profile rather than creating a media row, because an avatar belongs to a
+ * person rather than to a story.
+ */
+export async function uploadAvatar(
+  file: File,
+  onProgress: (fraction: number) => void = () => {},
+): Promise<string> {
+  if (!file.type.startsWith("image/")) throw new Error("Images only.");
+
+  onProgress(0);
+  const { blob } = await squareCrop(file);
+
+  const ticket = await requestUpload(blob.type, blob.size);
+  if (!ticket.ok) throw new Error(ticket.error);
+
+  await putWithProgress(ticket.url, blob, onProgress);
+  onProgress(1);
+  return ticket.key;
+}

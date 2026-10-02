@@ -10,6 +10,8 @@ import { uploadImage } from "@/lib/upload-client";
 import { docToText } from "@/lib/story-doc";
 import { StoryImage } from "./extensions";
 import { Toolbar } from "./Toolbar";
+import { PlaceField } from "./PlaceField";
+import type { Country } from "@/lib/countries";
 import {
   deleteStory,
   publishStory,
@@ -43,6 +45,9 @@ export function Editor({
   status,
   publicUrl,
   initialCover,
+  initialPlace,
+  initialCountry,
+  countryList,
 }: {
   storyId: string;
   initialTitle: string;
@@ -50,9 +55,13 @@ export function Editor({
   status: "draft" | "published" | "unlisted";
   publicUrl: string | null;
   initialCover: { id: string; url: string } | null;
+  initialPlace: string;
+  initialCountry: string;
+  countryList: Country[];
 }) {
   const router = useRouter();
   const [title, setTitle] = useState(initialTitle);
+  const [place, setPlace] = useState({ place: initialPlace, country: initialCountry });
   const [save, setSave] = useState<SaveState>({ kind: "clean" });
   const [publishError, setPublishError] = useState<string | null>(null);
   const [uploads, setUploads] = useState<Upload[]>([]);
@@ -67,6 +76,12 @@ export function Editor({
   useEffect(() => {
     titleRef.current = title;
   }, [title]);
+  // Same reason as the title: flush() reads the latest value from a ref so a
+  // save in flight never writes a stale place back over a newer edit.
+  const placeRef = useRef(place);
+  useEffect(() => {
+    placeRef.current = place;
+  }, [place]);
 
   // Toolbar state (which mark is active, what's selected) lives in the editor,
   // not in React -- re-render on each transaction so the buttons stay honest.
@@ -138,7 +153,10 @@ export function Editor({
       // server as "cannot dot into a temporary client reference". A JSON
       // round-trip guarantees plain objects.
       const doc = JSON.parse(JSON.stringify(editor.getJSON()));
-      const result = await saveStory(storyId, titleRef.current, doc);
+      const result = await saveStory(storyId, titleRef.current, doc, {
+        placeName: placeRef.current.place,
+        countryCode: placeRef.current.country,
+      });
       setSave(
         result.ok ? { kind: "saved" } : { kind: "error", message: result.error },
       );
@@ -291,6 +309,16 @@ export function Editor({
             router.refresh();
           })
         }
+      />
+
+      <PlaceField
+        place={place.place}
+        country={place.country}
+        countryList={countryList}
+        onChange={(next) => {
+          setPlace(next);
+          schedule();
+        }}
       />
 
       <input

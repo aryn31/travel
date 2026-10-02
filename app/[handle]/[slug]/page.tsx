@@ -157,7 +157,11 @@ export default async function StoryPage({
             <div className="lg:sticky lg:top-24">
               <div className="flex items-center gap-3 border-t border-rule pt-5 lg:border-0 lg:pt-0">
                 <Link href={`/@${profile.handle}`} className="shrink-0">
-                  <Avatar name={profile.displayName} handle={profile.handle} />
+                  <Avatar
+                    name={profile.displayName}
+                    handle={profile.handle}
+                    avatarKey={profile.avatarKey}
+                  />
                 </Link>
                 <div className="min-w-0 text-sm leading-tight">
                   <p className="eyebrow">Written by</p>
