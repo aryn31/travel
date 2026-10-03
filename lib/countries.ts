@@ -39,3 +39,20 @@ export function countries(locale = "en"): Country[] {
 export function isCountryCode(value: string): boolean {
   return CODES.includes(value.toUpperCase());
 }
+
+/*
+ * One code to one name, for the places a story actually names. Fixed to
+ * English rather than the reader's locale: Intl's region names differ
+ * between Node and Chrome for a handful of codes -- "Falkland Islands"
+ * against "Falkland Islands (Islas Malvinas)" -- and a name resolved twice
+ * is a hydration mismatch. Resolved once, on the server, in one language.
+ */
+const regions = new Intl.DisplayNames(["en"], { type: "region" });
+
+export function countryName(code: string): string {
+  try {
+    return regions.of(code.toUpperCase()) ?? code;
+  } catch {
+    return code;
+  }
+}

@@ -17,7 +17,8 @@
     "sweep:media": "NODE_OPTIONS=--conditions=react-server tsx --env-file=.env.local scripts/sweep-media.ts",
     "storage:migrate": "tsx --env-file=.env.local scripts/migrate-storage.ts",
     "storage:fixkeys": "tsx --env-file=.env.local scripts/fix-media-keys.ts",
-    "photo": "tsx --env-file=.env.local scripts/photo-preview.ts"
+    "photo": "tsx --env-file=.env.local scripts/photo-preview.ts",
+    "seed:social": "tsx --env-file=.env.local scripts/seed-social.ts"
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.11.3",

@@ -5,6 +5,8 @@ import { media, stories } from "@/lib/db/schema";
 import { getViewer } from "@/lib/session";
 import { publicUrl } from "@/lib/storage";
 import { countries } from "@/lib/countries";
+import { knownPlaces } from "@/lib/places";
+import { popularTags, tagsForStory, tagsToInput } from "@/lib/tags";
 import { Editor } from "./Editor";
 
 export const metadata = { title: "Write" };
@@ -25,6 +27,14 @@ export default async function WritePage({ params }: PageProps<"/write/[id]">) {
   if (!row) notFound();
   const { story, cover } = row;
 
+  /* Loaded with the page rather than fetched on keystrokes -- see
+     lib/places.ts. */
+  const [places, storyTagList, tagSuggestions] = await Promise.all([
+    knownPlaces(),
+    tagsForStory(story.id),
+    popularTags(),
+  ]);
+
   return (
     <Editor
       storyId={story.id}
@@ -42,6 +52,9 @@ export default async function WritePage({ params }: PageProps<"/write/[id]">) {
       initialPlace={story.placeName ?? ""}
       initialCountry={story.countryCode ?? ""}
       countryList={countries()}
+      places={places}
+      initialTags={tagsToInput(storyTagList)}
+      tagSuggestions={tagSuggestions}
     />
   );
 }

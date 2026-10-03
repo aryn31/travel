@@ -8,7 +8,13 @@ import { getViewer } from "@/lib/session";
 import { excerpt, hasMoreThanOpening, openingOf } from "@/lib/story-doc";
 import { METER_HEADER } from "@/lib/meter";
 import { publicUrl } from "@/lib/storage";
+import { hasLiked } from "@/lib/likes";
+import { listComments } from "@/lib/comments";
+import { tagsForStory } from "@/lib/tags";
 import { StoryBody } from "@/components/StoryBody";
+import { LikeButton } from "@/components/LikeButton";
+import { Comments } from "@/components/comments/Comments";
+import { TagChip } from "@/components/ui/TagChip";
 import { ReadWall } from "@/components/ReadWall";
 import { Avatar } from "@/components/ui/Avatar";
 import { PlaceMark } from "@/components/ui/PlaceMark";
@@ -87,6 +93,19 @@ export default async function StoryPage({
     (meterVerdict === "exhausted" || meterVerdict === "bypass") &&
     hasMoreThanOpening(story.bodyJson);
 
+  /*
+   * Only for a published story. A draft has no audience, so its likes and
+   * comments are both empty by construction and the queries are waste.
+   */
+  const live = story.status === "published";
+  const [liked, comments, storyTagList] = await Promise.all([
+    live ? hasLiked(story.id, viewer?.userId ?? null) : false,
+    live ? listComments(story.id, viewer?.userId ?? null) : [],
+    tagsForStory(story.id),
+  ]);
+
+  const path = `/@${profile.handle}/${story.slug}`;
+
   return (
     <main className="page flex-1 py-12 pb-24">
       {isAuthor && story.status !== "published" && (
@@ -106,12 +125,17 @@ export default async function StoryPage({
 
       <article>
         <header className="max-w-5xl">
-          {story.placeName && (
-            <div className="mb-5">
-              <PlaceMark
-                place={story.placeName}
-                countryCode={story.countryCode}
-              />
+          {(story.placeName || storyTagList.length > 0) && (
+            <div className="mb-5 flex flex-wrap items-center gap-2">
+              {story.placeName && (
+                <PlaceMark
+                  place={story.placeName}
+                  countryCode={story.countryCode}
+                />
+              )}
+              {storyTagList.map((t) => (
+                <TagChip key={t.slug} slug={t.slug} label={t.label} />
+              ))}
             </div>
           )}
           <h1 className="font-display text-balance text-4xl font-semibold leading-[1.05] tracking-tight sm:text-6xl">
@@ -203,6 +227,28 @@ export default async function StoryPage({
                 )}
               </dl>
 
+              {/* Only on something anyone can read. Liking your own unlisted
+                  draft is not a feature. */}
+              {live && (
+                <div className="mt-6 flex flex-wrap items-center gap-3">
+                  <LikeButton
+                    storyId={story.id}
+                    initialLiked={liked}
+                    initialCount={story.likeCount}
+                    signedIn={Boolean(viewer)}
+                    size="sm"
+                  />
+                  <a
+                    href="#comments"
+                    className="text-sm text-muted transition-colors hover:text-accent"
+                  >
+                    {story.commentCount === 1
+                      ? "1 comment"
+                      : `${story.commentCount} comments`}
+                  </a>
+                </div>
+              )}
+
               <div className="mt-6">
                 <ButtonLink
                   href={`/@${profile.handle}`}
@@ -227,6 +273,20 @@ export default async function StoryPage({
           </aside>
         </div>
       </article>
+
+      {/* Not behind the wall: someone who has not read the story has
+          nothing to say about it, and the comments would spoil what the
+          wall is withholding. */}
+      {live && !walled && (
+        <Comments
+          storyId={story.id}
+          path={path}
+          comments={comments}
+          total={story.commentCount}
+          signedIn={Boolean(viewer)}
+          needsProfile={Boolean(viewer && !viewer.profile)}
+        />
+      )}
     </main>
   );
 }

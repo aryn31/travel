@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useReducer, useRef, useState, useTransition } from "react";
+import {
+  useCallback,
+  useEffect,
+  useReducer,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 import { useRouter } from "next/navigation";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
@@ -11,7 +18,10 @@ import { docToText } from "@/lib/story-doc";
 import { StoryImage } from "./extensions";
 import { Toolbar } from "./Toolbar";
 import { PlaceField } from "./PlaceField";
+import { TagField } from "./TagField";
 import type { Country } from "@/lib/countries";
+import type { PlaceSuggestion } from "@/lib/places";
+import type { StoryTag } from "@/lib/tags-rules";
 import {
   deleteStory,
   publishStory,
@@ -48,6 +58,9 @@ export function Editor({
   initialPlace,
   initialCountry,
   countryList,
+  places,
+  initialTags,
+  tagSuggestions,
 }: {
   storyId: string;
   initialTitle: string;
@@ -58,10 +71,17 @@ export function Editor({
   initialPlace: string;
   initialCountry: string;
   countryList: Country[];
+  places: PlaceSuggestion[];
+  initialTags: string;
+  tagSuggestions: StoryTag[];
 }) {
   const router = useRouter();
   const [title, setTitle] = useState(initialTitle);
-  const [place, setPlace] = useState({ place: initialPlace, country: initialCountry });
+  const [place, setPlace] = useState({
+    place: initialPlace,
+    country: initialCountry,
+  });
+  const [tagInput, setTagInput] = useState(initialTags);
   const [save, setSave] = useState<SaveState>({ kind: "clean" });
   const [publishError, setPublishError] = useState<string | null>(null);
   const [uploads, setUploads] = useState<Upload[]>([]);
@@ -79,9 +99,14 @@ export function Editor({
   // Same reason as the title: flush() reads the latest value from a ref so a
   // save in flight never writes a stale place back over a newer edit.
   const placeRef = useRef(place);
+  const tagsRef = useRef(tagInput);
   useEffect(() => {
     placeRef.current = place;
   }, [place]);
+
+  useEffect(() => {
+    tagsRef.current = tagInput;
+  }, [tagInput]);
 
   // Toolbar state (which mark is active, what's selected) lives in the editor,
   // not in React -- re-render on each transaction so the buttons stay honest.
@@ -153,17 +178,42 @@ export function Editor({
       // server as "cannot dot into a temporary client reference". A JSON
       // round-trip guarantees plain objects.
       const doc = JSON.parse(JSON.stringify(editor.getJSON()));
-      const result = await saveStory(storyId, titleRef.current, doc, {
-        placeName: placeRef.current.place,
-        countryCode: placeRef.current.country,
-      });
-      setSave(
-        result.ok ? { kind: "saved" } : { kind: "error", message: result.error },
+      const sentPlace = placeRef.current.place;
+      const result = await saveStory(
+        storyId,
+        titleRef.current,
+        doc,
+        { placeName: sentPlace, countryCode: placeRef.current.country },
+        tagsRef.current,
       );
+      setSave(
+        result.ok
+          ? { kind: "saved" }
+          : { kind: "error", message: result.error },
+      );
+
+      /*
+       * The server may have snapped the place to the spelling it already
+       * goes by, so the field catches up with what was actually stored.
+       * Only if the box still holds what was sent -- the same stale-write
+       * guard placeRef exists for, since the writer may have typed on while
+       * this save was in flight.
+       */
+      if (
+        result.ok &&
+        result.placeName &&
+        result.placeName !== sentPlace &&
+        placeRef.current.place === sentPlace
+      ) {
+        setPlace((p) => ({ ...p, place: result.placeName! }));
+      }
     } catch {
       // Without this the promise rejects unhandled and the status line sits on
       // "Saving…" forever, which reads exactly like a successful save.
-      setSave({ kind: "error", message: "Couldn't save — check your connection." });
+      setSave({
+        kind: "error",
+        message: "Couldn't save — check your connection.",
+      });
     }
   }, [editor, storyId]);
 
@@ -214,7 +264,9 @@ export function Editor({
     setUploads((u) => [...u, { id, name: file.name, progress: 0 }]);
     try {
       const image = await uploadImage(file, storyId, (p) =>
-        setUploads((u) => u.map((x) => (x.id === id ? { ...x, progress: p } : x))),
+        setUploads((u) =>
+          u.map((x) => (x.id === id ? { ...x, progress: p } : x)),
+        ),
       );
       await setCover(storyId, image.id);
       setCoverState({ id: image.id, url: image.url });
@@ -242,7 +294,6 @@ export function Editor({
     [],
   );
 
-
   async function onPublish() {
     setPublishError(null);
     await flush();
@@ -255,139 +306,158 @@ export function Editor({
   }
 
   return (
-    <div className="page flex-1 py-10"><div className="reading">
-      <div className="mb-8 flex items-center justify-between gap-4 text-sm">
-        <StatusLine state={save} status={status} publicUrl={publicUrl} />
-        <div className="flex items-center gap-3">
-          {status === "draft" ? (
-            <button
-              type="button"
-              onClick={() => void onPublish()}
-              disabled={pending || uploads.length > 0}
-              className="rounded-full bg-foreground px-4 py-1.5 font-medium text-background transition-opacity hover:opacity-85 disabled:opacity-40"
-            >
-              Publish
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() =>
-                startTransition(async () => {
-                  await flush();
-                  await unpublishStory(storyId);
-                  router.refresh();
-                })
-              }
-              disabled={pending}
-              className="rounded-full border border-rule px-4 py-1.5 transition-colors hover:bg-surface-hover disabled:opacity-40"
-            >
-              Unpublish
-            </button>
-          )}
-          <DeleteButton storyId={storyId} disabled={pending} />
+    <div className="page flex-1 py-10">
+      <div className="reading">
+        <div className="mb-8 flex items-center justify-between gap-4 text-sm">
+          <StatusLine state={save} status={status} publicUrl={publicUrl} />
+          <div className="flex items-center gap-3">
+            {status === "draft" ? (
+              <button
+                type="button"
+                onClick={() => void onPublish()}
+                disabled={pending || uploads.length > 0}
+                className="rounded-full bg-foreground px-4 py-1.5 font-medium text-background transition-opacity hover:opacity-85 disabled:opacity-40"
+              >
+                Publish
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() =>
+                  startTransition(async () => {
+                    await flush();
+                    await unpublishStory(storyId);
+                    router.refresh();
+                  })
+                }
+                disabled={pending}
+                className="rounded-full border border-rule px-4 py-1.5 transition-colors hover:bg-surface-hover disabled:opacity-40"
+              >
+                Unpublish
+              </button>
+            )}
+            <DeleteButton storyId={storyId} disabled={pending} />
+          </div>
         </div>
-      </div>
 
-      {publishError && (
-        <p role="alert" className="mb-4 text-sm text-red-600 dark:text-red-400">
-          {publishError}
-        </p>
-      )}
-      {uploadError && (
-        <p role="alert" className="mb-4 text-sm text-red-600 dark:text-red-400">
-          {uploadError}
-        </p>
-      )}
+        {publishError && (
+          <p
+            role="alert"
+            className="mb-4 text-sm text-red-600 dark:text-red-400"
+          >
+            {publishError}
+          </p>
+        )}
+        {uploadError && (
+          <p
+            role="alert"
+            className="mb-4 text-sm text-red-600 dark:text-red-400"
+          >
+            {uploadError}
+          </p>
+        )}
 
-      <CoverPicker
-        cover={cover}
-        onPick={() => coverInput.current?.click()}
-        onRemove={() =>
-          startTransition(async () => {
-            await setCover(storyId, null);
-            setCoverState(null);
-            router.refresh();
-          })
-        }
-      />
-
-      <PlaceField
-        place={place.place}
-        country={place.country}
-        countryList={countryList}
-        onChange={(next) => {
-          setPlace(next);
-          schedule();
-        }}
-      />
-
-      <input
-        aria-label="Title"
-        value={title}
-        onChange={(e) => {
-          setTitle(e.target.value);
-          schedule();
-        }}
-        onBlur={() => save.kind === "dirty" && void flush()}
-        placeholder="Title"
-        className="font-display mb-2 w-full bg-transparent text-4xl font-semibold tracking-tight outline-none placeholder:text-faint"
-      />
-
-      {editor && (
-        <Toolbar
-          editor={editor}
-          onPickImage={() => fileInput.current?.click()}
-          uploading={uploads.length > 0}
-          words={words}
+        <CoverPicker
+          cover={cover}
+          onPick={() => coverInput.current?.click()}
+          onRemove={() =>
+            startTransition(async () => {
+              await setCover(storyId, null);
+              setCoverState(null);
+              router.refresh();
+            })
+          }
         />
-      )}
 
-      <EditorContent editor={editor} />
+        <div className="mb-6 rounded-xl border border-rule bg-surface/60 p-4">
+          <PlaceField
+            place={place.place}
+            country={place.country}
+            countryList={countryList}
+            places={places}
+            onChange={(next) => {
+              setPlace(next);
+              schedule();
+            }}
+          />
 
-      {uploads.length > 0 && (
-        <ul className="mt-6 space-y-2" aria-live="polite">
-          {uploads.map((u) => (
-            <li key={u.id} className="text-sm">
-              <span className="text-muted">{u.name}</span>
-              <span className="mt-1 block h-1 overflow-hidden rounded-full bg-rule">
-                <span
-                  className="block h-full rounded-full bg-accent transition-[width]"
-                  style={{ width: `${Math.round(u.progress * 100)}%` }}
-                />
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
+          <TagField
+            value={tagInput}
+            suggestions={tagSuggestions}
+            onChange={(next) => {
+              setTagInput(next);
+              schedule();
+            }}
+          />
+        </div>
 
-      <p className="mt-10 text-xs text-faint">
-        Drag photos in, or paste them. They&apos;re resized to 2560px before
-        upload.
-      </p>
+        <input
+          aria-label="Title"
+          value={title}
+          onChange={(e) => {
+            setTitle(e.target.value);
+            schedule();
+          }}
+          onBlur={() => save.kind === "dirty" && void flush()}
+          placeholder="Title"
+          className="font-display mb-2 w-full bg-transparent text-4xl font-semibold tracking-tight outline-none placeholder:text-faint"
+        />
 
-      <input
-        ref={fileInput}
-        type="file"
-        accept="image/jpeg,image/png,image/webp,image/avif"
-        multiple
-        hidden
-        onChange={(e) => {
-          const files = Array.from(e.target.files ?? []);
-          e.target.value = "";
-          if (files.length) void handleFiles(files);
-        }}
-      />
-      <input
-        ref={coverInput}
-        type="file"
-        accept="image/jpeg,image/png,image/webp,image/avif"
-        hidden
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          e.target.value = "";
-          if (file) void handleCover(file);
-        }}
-      />
+        {editor && (
+          <Toolbar
+            editor={editor}
+            onPickImage={() => fileInput.current?.click()}
+            uploading={uploads.length > 0}
+            words={words}
+          />
+        )}
+
+        <EditorContent editor={editor} />
+
+        {uploads.length > 0 && (
+          <ul className="mt-6 space-y-2" aria-live="polite">
+            {uploads.map((u) => (
+              <li key={u.id} className="text-sm">
+                <span className="text-muted">{u.name}</span>
+                <span className="mt-1 block h-1 overflow-hidden rounded-full bg-rule">
+                  <span
+                    className="block h-full rounded-full bg-accent transition-[width]"
+                    style={{ width: `${Math.round(u.progress * 100)}%` }}
+                  />
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <p className="mt-10 text-xs text-faint">
+          Drag photos in, or paste them. They&apos;re resized to 2560px before
+          upload.
+        </p>
+
+        <input
+          ref={fileInput}
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/avif"
+          multiple
+          hidden
+          onChange={(e) => {
+            const files = Array.from(e.target.files ?? []);
+            e.target.value = "";
+            if (files.length) void handleFiles(files);
+          }}
+        />
+        <input
+          ref={coverInput}
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/avif"
+          hidden
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            e.target.value = "";
+            if (file) void handleCover(file);
+          }}
+        />
       </div>
     </div>
   );
@@ -423,10 +493,18 @@ function CoverPicker({
         className="h-56 w-full rounded-xl object-cover"
       />
       <div className="mt-2 flex gap-4 text-sm">
-        <button type="button" onClick={onPick} className="underline opacity-60 hover:opacity-100">
+        <button
+          type="button"
+          onClick={onPick}
+          className="underline opacity-60 hover:opacity-100"
+        >
           Replace
         </button>
-        <button type="button" onClick={onRemove} className="underline opacity-60 hover:opacity-100">
+        <button
+          type="button"
+          onClick={onRemove}
+          className="underline opacity-60 hover:opacity-100"
+        >
           Remove cover
         </button>
       </div>
@@ -458,7 +536,9 @@ function StatusLine({
 
   return (
     <p
-      className={state.kind === "error" ? "text-red-600 dark:text-red-400" : "text-muted"}
+      className={
+        state.kind === "error" ? "text-red-600 dark:text-red-400" : "text-muted"
+      }
       aria-live="polite"
     >
       {label}
@@ -474,7 +554,13 @@ function StatusLine({
   );
 }
 
-function DeleteButton({ storyId, disabled }: { storyId: string; disabled: boolean }) {
+function DeleteButton({
+  storyId,
+  disabled,
+}: {
+  storyId: string;
+  disabled: boolean;
+}) {
   const [armed, setArmed] = useState(false);
   const [pending, startTransition] = useTransition();
 
@@ -501,7 +587,11 @@ function DeleteButton({ storyId, disabled }: { storyId: string; disabled: boolea
       >
         {pending ? "Deleting…" : "Really delete"}
       </button>
-      <button type="button" onClick={() => setArmed(false)} className="opacity-50 hover:opacity-100">
+      <button
+        type="button"
+        onClick={() => setArmed(false)}
+        className="opacity-50 hover:opacity-100"
+      >
         Cancel
       </button>
     </span>

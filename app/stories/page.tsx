@@ -1,19 +1,24 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getViewer } from "@/lib/session";
+import { countryName } from "@/lib/countries";
 import {
+  cityFacets,
   countryFacets,
   matchingWriters,
   parseQuery,
   searchStories,
   storiesHref,
+  tagFacetsFor,
   SORTS,
   type Query,
   type Sort,
 } from "@/lib/search";
 import { SearchForm } from "@/components/stories/SearchForm";
 import { CountryFilter } from "@/components/stories/CountryFilter";
-import { ResultGrid } from "@/components/stories/ResultGrid";
+import { CityFilter } from "@/components/stories/CityFilter";
+import { TagFilter } from "@/components/stories/TagFilter";
+import { EditorialResults } from "@/components/stories/EditorialResults";
 import { WriterHits } from "@/components/stories/WriterHits";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Reveal } from "@/components/Reveal";
@@ -21,6 +26,7 @@ import { Reveal } from "@/components/Reveal";
 const SORT_LABELS: Record<Sort, string> = {
   relevant: "Best match",
   recent: "Newest",
+  liked: "Most liked",
   longest: "Longest read",
 };
 
@@ -28,11 +34,27 @@ export async function generateMetadata({
   searchParams,
 }: PageProps<"/stories">) {
   const query = parseQuery(await searchParams);
+
+  /* The city is the most specific thing the URL says, so it wins the tab
+     title; a search for a word beats a country but not a named place. */
+  const title = query.city
+    ? query.country
+      ? `${query.city}, ${countryName(query.country)}`
+      : query.city
+    : query.q
+      ? `“${query.q}”`
+      : query.country
+        ? countryName(query.country)
+        : "All stories";
+
   return {
-    title: query.q ? `“${query.q}”` : "All stories",
+    title,
     description: "Every story published here, searchable by place or word.",
     // A search result page is not something to index; the stories are.
-    robots: query.q || query.country ? { index: false, follow: true } : undefined,
+    robots:
+      query.q || query.country || query.city || query.tag
+        ? { index: false, follow: true }
+        : undefined,
   };
 }
 
@@ -61,13 +83,36 @@ export default async function StoriesPage({
 
   const query = parseQuery(raw);
 
-  const [{ results, total, pages }, facets, writers] = await Promise.all([
+  /* Only changes the wording of the empty state and the headings -- one
+     layout now serves both browsing and searching. */
+  const searching = Boolean(
+    query.q || query.country || query.city || query.tag,
+  );
+
+  /*
+   * One list, in rank order, whatever brought you here. Size follows
+   * position: poster, cards, numbered rows. With a query that ranking is
+   * relevance; without one it is the chosen sort, and the lead says which
+   * ("Best match" / "Newest" / "Longest read") rather than implying an
+   * answer to a question nobody asked.
+   *
+   * Place is navigated by the chip rows above, not by the shape of the
+   * list.
+   */
+  const [found, facets, cities, topics, writers] = await Promise.all([
     searchStories(query),
     countryFacets(query),
+    cityFacets(query),
+    tagFacetsFor(query),
     matchingWriters(query),
   ]);
 
-  const searching = Boolean(query.q || query.country);
+  const { total, pages } = found;
+
+  /* A page number past the end: the pager and the heading both follow the
+     real page count rather than echoing ?page=99. */
+  const page = Math.min(query.page, pages);
+  const shown = { ...query, page };
 
   return (
     <main className="flex-1">
@@ -93,8 +138,10 @@ export default async function StoriesPage({
             <SearchForm query={query} />
           </div>
 
-          <div className="mt-7">
+          <div className="mt-7 space-y-3">
             <CountryFilter facets={facets} query={query} />
+            <CityFilter cities={cities} query={query} />
+            <TagFilter facets={topics} query={query} />
           </div>
         </div>
       </section>
@@ -118,10 +165,45 @@ export default async function StoriesPage({
                 </span>
               </>
             )}
+            {/* Where, stated once in prose. The chips above say what is
+                selected by looking selected; this says it in words, which
+                is what gets read first. */}
+            {query.tag && (
+              <>
+                {" "}
+                about{" "}
+                <span className="font-medium text-foreground">
+                  {topics.find((t) => t.slug === query.tag)?.label ?? query.tag}
+                </span>
+              </>
+            )}
+            {(query.city || query.country) && (
+              <>
+                {" "}
+                in{" "}
+                <span className="font-medium text-foreground">
+                  {query.city && query.country
+                    ? `${query.city}, ${countryName(query.country)}`
+                    : (query.city ?? countryName(query.country!))}
+                </span>
+              </>
+            )}
+            {/* Countries reachable from here, counted off the facet row
+                rather than queried again. */}
+            {!query.country && facets.length > 0 && (
+              <>
+                {" "}
+                ·{" "}
+                <span className="font-display text-lg font-semibold text-foreground">
+                  {facets.length}
+                </span>{" "}
+                {facets.length === 1 ? "country" : "countries"}
+              </>
+            )}
             {pages > 1 && (
               <>
                 {" "}
-                · page {query.page} of {pages}
+                · page {page} of {pages}
               </>
             )}
           </p>
@@ -149,7 +231,7 @@ export default async function StoriesPage({
             row that should repeat down every page of results. */}
         {query.page === 1 && <WriterHits writers={writers} />}
 
-        {results.length === 0 ? (
+        {found.results.length === 0 ? (
           <EmptyState title={searching ? "Nothing matched" : "Nothing published yet"}>
             {searching ? (
               <>
@@ -168,11 +250,16 @@ export default async function StoriesPage({
           </EmptyState>
         ) : (
           <Reveal>
-            <ResultGrid results={results} />
+            <EditorialResults
+              results={found.results}
+              page={query.page}
+              sort={query.sort}
+              query={query}
+            />
           </Reveal>
         )}
 
-        {pages > 1 && <Pager query={query} pages={pages} />}
+        {pages > 1 && <Pager query={shown} pages={pages} />}
       </section>
     </main>
   );

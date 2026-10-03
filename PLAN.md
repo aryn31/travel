@@ -253,8 +253,24 @@ as three lexemes, so the handle "seokjin" matched none of them. Snippets come fr
 `ts_headline` with control-character delimiters, split and rendered as
 elements, so the highlight is the same match that produced the ranking and no
 HTML is ever interpolated. The form is a plain GET — every search is a
-shareable URL and it works with no JavaScript at all. Tags, likes and comments
-still outstanding.
+shareable URL and it works with no JavaScript at all.
+
+*Likes, comments and tags.* `stories.like_count` and `comment_count` existed
+from migration 0001 and were never written to; they are now caches of
+`likes` and `comments`, recomputed from the rows inside the same transaction
+rather than incremented, so a retried action or a cascade cannot make them
+drift. Comments are one level deep -- a reply to a reply is reparented onto
+the thread's root, because unbounded nesting runs out of horizontal room by
+the third reply and needs collapse controls to be readable at all. Removal
+is soft: the row stays so its replies keep their place, and the story's
+author can remove anything on their own story, which is the only moderation
+there is until the reports queue in Week 5. Tags answer "what is it about",
+deliberately not "where" -- place already has country and city, and a second
+taxonomy answering the same question would only be a worse country filter.
+The slug is the identity, so "By Train" and "by train" are one tag. All four
+tables are revoked from `anon` with RLS on (migration 0014); `likes` and
+`comments` are the first tables here that tie a named person to what they
+read and said.
 
 **Week 5 — hardening (local)**
 Reports flow + admin list + soft delete, Lighthouse pass against a production

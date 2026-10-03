@@ -3,6 +3,7 @@ import { getViewer } from "@/lib/session";
 import { Avatar } from "./ui/Avatar";
 import { ButtonLink } from "./ui/Button";
 import { HeaderShell } from "./HeaderShell";
+import { NavLink } from "./NavLink";
 import { ThemeToggle } from "./ThemeToggle";
 import { SignOutButton } from "./SignOutButton";
 
@@ -26,7 +27,7 @@ export async function SiteHeader() {
                 <>
                   <NavLink href="/write">Write</NavLink>
                   <NavLink href="/drafts">Yours</NavLink>
-                  <NavLink href={`/@${viewer.profile.handle}`}>
+                  <NavLink href={`/@${viewer.profile.handle}`} exact>
                     <Avatar
                       name={viewer.profile.displayName}
                       handle={viewer.profile.handle}
@@ -56,16 +57,5 @@ export async function SiteHeader() {
         </nav>
       </div>
     </HeaderShell>
-  );
-}
-
-function NavLink({ href, children }: { href: string; children: React.ReactNode }) {
-  return (
-    <Link
-      href={href}
-      className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-foreground/75 transition-colors hover:bg-surface-hover hover:text-foreground"
-    >
-      {children}
-    </Link>
   );
 }

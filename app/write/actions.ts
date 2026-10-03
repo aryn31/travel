@@ -12,6 +12,8 @@ import { docToSummary, docToText, isDoc, readingMinutes } from "@/lib/story-doc"
 import { remove as removeFromStorage } from "@/lib/storage";
 import { reconcileStoryMedia } from "@/lib/media-gc";
 import { isCountryCode } from "@/lib/countries";
+import { canonicalPlaceName } from "@/lib/places";
+import { parseTags, setStoryTags } from "@/lib/tags";
 
 /**
  * Every mutation goes through this. Ownership is checked against the session
@@ -53,7 +55,15 @@ export async function createDraft() {
 // an arbitrarily large document in the database.
 const MAX_DOC_BYTES = 1_000_000;
 
-export type SaveResult = { ok: true; savedAt: number } | { ok: false; error: string };
+export type SaveResult =
+  /*
+   * `placeName` is what was stored, which is not always what was sent:
+   * a place snaps to the spelling it already goes by. Reported back so the
+   * field can show it, rather than leaving the writer looking at "naples"
+   * while the database and every reader say "Naples".
+   */
+  | { ok: true; savedAt: number; placeName: string | null }
+  | { ok: false; error: string };
 
 export type SavePlace = { placeName: string; countryCode: string };
 
@@ -62,6 +72,8 @@ export async function saveStory(
   title: string,
   doc: unknown,
   place?: SavePlace,
+  /** Raw, comma-separated, exactly as typed -- parsed here, not in the browser. */
+  tagInput?: string,
 ): Promise<SaveResult> {
   const story = await requireOwnStory(storyId);
 
@@ -87,7 +99,21 @@ export async function saveStory(
    * a bad value means something tampered, and failing the whole save would
    * cost the author their paragraph to punish a field they cannot see.
    */
-  const placeName = place?.placeName.trim().slice(0, 120) || null;
+  /*
+   * Snapped to the spelling this place already goes by, so "naples" saves
+   * as "Naples". Every query already matches case insensitively; this is
+   * what makes the story's own page agree with the filter chip rather than
+   * quietly holding a third spelling of somewhere everyone else named.
+   */
+  const typedPlace = place?.placeName.trim().slice(0, 120) || null;
+  /* Skipped when the field has not been touched. Autosave fires every
+     1.2 seconds of typing, and a round trip to Supabase to re-answer a
+     question about a field nobody edited is latency on every keystroke
+     run. */
+  const placeName =
+    !typedPlace || typedPlace === story.placeName
+      ? typedPlace
+      : await canonicalPlaceName(typedPlace);
   const countryCode =
     place?.countryCode && isCountryCode(place.countryCode)
       ? place.countryCode.toUpperCase()
@@ -99,6 +125,15 @@ export async function saveStory(
     story.status === "draft"
       ? await slugForTitle(story.authorId, cleanTitle, story.id)
       : story.slug;
+
+  /*
+   * Parsed server-side even though the field already previews the result:
+   * the preview is a convenience, and the string arrives from a browser
+   * that may not have run it.
+   */
+  if (tagInput !== undefined) {
+    await setStoryTags(story.id, parseTags(tagInput));
+  }
 
   await db
     .update(stories)
@@ -124,7 +159,7 @@ export async function saveStory(
   await reconcileStoryMedia(story.id);
 
   if (story.status !== "draft") await revalidateStory(story.authorId, slug);
-  return { ok: true, savedAt: Date.now() };
+  return { ok: true, savedAt: Date.now(), placeName };
 }
 
 export type PublishResult = { ok: true; url: string } | { ok: false; error: string };

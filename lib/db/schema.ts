@@ -11,6 +11,7 @@ import {
   primaryKey,
   uniqueIndex,
   customType,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 import type { AdapterAccountType } from "next-auth/adapters";
 
@@ -299,3 +300,124 @@ export const stories = pgTable(
 
 export type Story = typeof stories.$inferSelect;
 export type Media = typeof media.$inferSelect;
+
+/* ------------------------------------------------------------------ *
+ * Likes
+ * ------------------------------------------------------------------ */
+
+/**
+ * One row per person per story. The composite primary key is the whole
+ * rule: liking twice is not a thing that can happen, enforced by the
+ * database rather than by remembering to check first.
+ */
+export const likes = pgTable(
+  "likes",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    storyId: text("story_id")
+      .notNull()
+      .references(() => stories.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.storyId] }),
+    // The primary key reads user-first, so counting a story's likes would
+    // have no index to use.
+    index("likes_story_idx").on(t.storyId),
+  ],
+);
+
+export type Like = typeof likes.$inferSelect;
+
+/* ------------------------------------------------------------------ *
+ * Comments
+ * ------------------------------------------------------------------ */
+
+export const comments = pgTable(
+  "comments",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    storyId: text("story_id")
+      .notNull()
+      .references(() => stories.id, { onDelete: "cascade" }),
+    authorId: text("author_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+
+    /*
+     * One level deep, and only one. Enforced in lib/comments.ts rather than
+     * by the column, because the column cannot express it: a reply to a
+     * reply is rewritten to point at the thread's root, so a conversation
+     * stays readable instead of marching off the right-hand edge.
+     */
+    parentId: text("parent_id").references((): AnyPgColumn => comments.id, {
+      onDelete: "cascade",
+    }),
+
+    body: text("body").notNull(),
+
+    /*
+     * Soft delete. A removed comment with replies still has to hold its
+     * place in the thread, or the replies become answers to nothing -- and
+     * a moderator needs to be able to see what was said after the fact.
+     * The body is kept; nothing reads it once this is set.
+     */
+    deletedAt: timestamp("deleted_at"),
+
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    // The reading page's query: a story's comments, oldest first.
+    index("comments_story_idx").on(t.storyId, t.createdAt),
+    index("comments_parent_idx").on(t.parentId),
+  ],
+);
+
+export type Comment = typeof comments.$inferSelect;
+
+/* ------------------------------------------------------------------ *
+ * Tags
+ * ------------------------------------------------------------------ */
+
+/**
+ * What a story is about, as opposed to where it happened -- place already
+ * has country and city, and a second taxonomy answering the same question
+ * would just be a worse version of the first. These are kinds of travel:
+ * solo, food, hiking, by train.
+ *
+ * The slug is the identity and the label is what gets shown, so "By train"
+ * and "by train" are one tag.
+ */
+export const tags = pgTable("tags", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  slug: text("slug").notNull().unique(),
+  label: text("label").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export type Tag = typeof tags.$inferSelect;
+
+export const storyTags = pgTable(
+  "story_tags",
+  {
+    storyId: text("story_id")
+      .notNull()
+      .references(() => stories.id, { onDelete: "cascade" }),
+    tagId: text("tag_id")
+      .notNull()
+      .references(() => tags.id, { onDelete: "cascade" }),
+  },
+  (t) => [
+    primaryKey({ columns: [t.storyId, t.tagId] }),
+    // "Every story with this tag" is the whole point of the table, and the
+    // primary key is story-first.
+    index("story_tags_tag_idx").on(t.tagId),
+  ],
+);

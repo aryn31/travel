@@ -1,18 +1,7 @@
-import Link from "next/link";
 import { storiesHref, type Query } from "@/lib/search";
+import { Chip } from "./Chip";
 import { flagFor } from "@/components/ui/PlaceMark";
-
-/* Intl knows every ISO 3166-1 code and localises it; a hand-kept lookup
-   table would only be a list of countries to forget to update. */
-const regions = new Intl.DisplayNames(["en"], { type: "region" });
-
-function nameFor(code: string) {
-  try {
-    return regions.of(code) ?? code;
-  } catch {
-    return code;
-  }
-}
+import { countryName } from "@/lib/countries";
 
 export function CountryFilter({
   facets,
@@ -26,7 +15,7 @@ export function CountryFilter({
   return (
     <div className="flex flex-wrap items-center gap-2">
       <Chip
-        href={storiesHref(query, { country: null, page: 1 })}
+        href={storiesHref(query, { country: null, city: null, page: 1 })}
         active={!query.country}
       >
         Everywhere
@@ -37,9 +26,12 @@ export function CountryFilter({
         return (
           <Chip
             key={f.code}
-            // Clicking the country you are already in takes it off again.
+            /* Clicking the country you are already in takes it off again.
+               Either way the city goes: a city filter outliving its own
+               country would leave "Naples" applied while browsing Ghana. */
             href={storiesHref(query, {
               country: active ? null : f.code,
+              city: null,
               page: 1,
             })}
             active={active}
@@ -47,7 +39,7 @@ export function CountryFilter({
             <span aria-hidden className="mr-1.5 text-[1.05em] leading-none">
               {flagFor(f.code)}
             </span>
-            {nameFor(f.code)}
+            {countryName(f.code)}
             <span className={active ? "ml-1.5 opacity-70" : "ml-1.5 text-faint"}>
               {f.count}
             </span>
@@ -55,29 +47,5 @@ export function CountryFilter({
         );
       })}
     </div>
-  );
-}
-
-function Chip({
-  href,
-  active,
-  children,
-}: {
-  href: string;
-  active: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <Link
-      href={href}
-      aria-current={active ? "true" : undefined}
-      className={`inline-flex items-center rounded-full border-2 px-3.5 py-1.5 text-sm font-medium transition-all ${
-        active
-          ? "border-foreground bg-foreground text-background"
-          : "border-rule bg-background text-muted hover:border-accent/50 hover:text-foreground"
-      }`}
-    >
-      {children}
-    </Link>
   );
 }

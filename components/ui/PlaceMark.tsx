@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 /**
  * Place and country, drawn from the fields a story already carries. Standing
  * in for the map that arrives in phase 2 -- and the reason this reads as
@@ -17,20 +19,27 @@ export function PlaceMark({
   place,
   countryCode,
   size = "md",
+  href,
 }: {
   place: string | null;
   countryCode: string | null;
   size?: "sm" | "md";
+  /**
+   * Makes the mark a filter rather than a caption. Only passed where the
+   * mark is not already inside a link -- a story card's cover wraps its own
+   * anchor, and an anchor inside an anchor is not markup a browser honours.
+   */
+  href?: string;
 }) {
   if (!place) return null;
   const flag = countryCode ? flagFor(countryCode) : null;
 
-  return (
-    <span
-      className={`inline-flex items-center gap-1.5 rounded-full border border-sea/25 bg-sea/8 font-medium text-sea ${
-        size === "sm" ? "px-2 py-0.5 text-xs" : "px-2.5 py-1 text-sm"
-      }`}
-    >
+  const shape = `inline-flex items-center gap-1.5 rounded-full border border-sea/25 bg-sea/8 font-medium text-sea ${
+    size === "sm" ? "px-2 py-0.5 text-xs" : "px-2.5 py-1 text-sm"
+  }`;
+
+  const body = (
+    <>
       {flag ? (
         <span aria-hidden className="text-[1.1em] leading-none">
           {flag}
@@ -49,8 +58,23 @@ export function PlaceMark({
         </svg>
       )}
       {place}
-    </span>
+    </>
   );
+
+  /* Two branches rather than one element with a variable tag: Link and span
+     do not share a props type, and the single `href` is not worth a cast. */
+  if (href) {
+    return (
+      <Link
+        href={href}
+        className={`${shape} transition-colors hover:border-sea/60 hover:bg-sea/15`}
+      >
+        {body}
+      </Link>
+    );
+  }
+
+  return <span className={shape}>{body}</span>;
 }
 
 export { flagFor };

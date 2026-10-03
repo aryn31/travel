@@ -16,6 +16,8 @@ export function SearchForm({ query }: { query: Query }) {
       {query.country && (
         <input type="hidden" name="country" value={query.country} />
       )}
+      {query.city && <input type="hidden" name="city" value={query.city} />}
+      {query.tag && <input type="hidden" name="tag" value={query.tag} />}
       {query.sort !== "relevant" && (
         <input type="hidden" name="sort" value={query.sort} />
       )}
@@ -49,7 +51,7 @@ export function SearchForm({ query }: { query: Query }) {
           Search
         </button>
 
-        {(query.q || query.country) && (
+        {(query.q || query.country || query.city || query.tag) && (
           <Link
             href="/stories"
             className="flex shrink-0 items-center justify-center rounded-full px-5 py-4 text-sm text-muted transition-colors hover:text-foreground"
