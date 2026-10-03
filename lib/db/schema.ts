@@ -189,10 +189,25 @@ export const pendingSignups = pgTable("pending_signups", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+/**
+ * Four states, two questions: can anyone else open it, and does it appear
+ * in lists.
+ *
+ *   draft      no URL anyone else can open; the author is still writing
+ *   published  open to everyone, listed everywhere
+ *   unlisted   open to anyone holding the link, listed nowhere
+ *   private    open to the author alone, listed nowhere
+ *
+ * `unlisted` was declared in the first migration and never set by anything
+ * until now. Every listing query already filters on `= 'published'`, so
+ * adding states to this enum hides them from the archive, the home page,
+ * profiles and search without touching a single one of those queries.
+ */
 export const storyStatus = pgEnum("story_status", [
   "draft",
   "published",
   "unlisted",
+  "private",
 ]);
 
 export const media = pgTable("media", {

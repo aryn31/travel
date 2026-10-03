@@ -5,6 +5,13 @@ import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { media, profiles, stories } from "@/lib/db/schema";
 import { getViewer } from "@/lib/session";
+import {
+  isFrozen,
+  isListed,
+  isReadable,
+  VISIBILITY_HINT,
+  VISIBILITY_LABEL,
+} from "@/lib/visibility";
 import { excerpt, hasMoreThanOpening, openingOf } from "@/lib/story-doc";
 import { METER_HEADER } from "@/lib/meter";
 import { publicUrl } from "@/lib/storage";
@@ -47,15 +54,19 @@ export async function generateMetadata({
   const row = await load(handle, slug);
   if (!row) return {};
 
-  const isPublic = row.story.status === "published";
   return {
     title: row.story.title || "Untitled",
     description: excerpt(row.story.excerpt || row.story.bodyText, 160),
     openGraph: row.cover
       ? { images: [{ url: publicUrl(row.cover.storageKey) }] }
       : undefined,
-    // A draft is reachable by its author, so it must never be indexable.
-    robots: isPublic ? undefined : { index: false, follow: false },
+    /*
+     * Only a listed story is indexable. An unlisted one is readable by
+     * anyone holding the link, which is exactly why it must not be found
+     * any other way -- being crawled would undo the only thing the state
+     * is for. Drafts and private stories are the author's alone.
+     */
+    robots: isListed(row.story.status) ? undefined : { index: false, follow: false },
   };
 }
 
@@ -70,9 +81,13 @@ export default async function StoryPage({
   const viewer = await getViewer();
   const isAuthor = viewer?.userId === story.authorId;
 
-  // Same 404 as a missing story: a draft's existence shouldn't be probeable
-  // by anyone but its author.
-  if (story.status === "draft" && !isAuthor) notFound();
+  /*
+   * Same 404 as a missing story: whether a draft or a private story exists
+   * at this URL should not be probeable by anyone but its author. Unlisted
+   * is the one non-public state that does answer -- that is its whole
+   * purpose.
+   */
+  if (!isAuthor && !isReadable(story.status)) notFound();
 
   /*
    * The free-read meter. proxy.ts counts the read and reports what the
@@ -87,6 +102,12 @@ export default async function StoryPage({
   const meterVerdict = (await headers()).get(METER_HEADER);
   const walled =
     !viewer &&
+    /*
+     * The meter governs the public archive. Walling an unlisted story
+     * would break the one thing someone chose that state to do -- hand the
+     * link to a person who does not have an account.
+     */
+    isListed(story.status) &&
     // "bypass" with no viewer means a session cookie that no longer
     // resolves -- an expired session, which should be asked to sign in.
     // A missing header means the proxy did not run; fail open there.
@@ -97,7 +118,11 @@ export default async function StoryPage({
    * Only for a published story. A draft has no audience, so its likes and
    * comments are both empty by construction and the queries are waste.
    */
-  const live = story.status === "published";
+  /*
+   * Likes and comments need somebody other than the author able to reach
+   * the page. A private story has an audience of one, and a draft none.
+   */
+  const live = isReadable(story.status);
   const [liked, comments, storyTagList] = await Promise.all([
     live ? hasLiked(story.id, viewer?.userId ?? null) : false,
     live ? listComments(story.id, viewer?.userId ?? null) : [],
@@ -108,17 +133,22 @@ export default async function StoryPage({
 
   return (
     <main className="page flex-1 py-12 pb-24">
-      {isAuthor && story.status !== "published" && (
+      {/* What the author is looking at, when it is not the public page.
+          Named per state rather than "Draft" for all three -- "only you can
+          see this" is simply false for an unlisted story. */}
+      {isAuthor && !isListed(story.status) && (
         <div className="mb-10 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-accent/30 bg-accent-soft px-4 py-3 text-sm">
           <span>
-            <strong className="font-medium">Draft</strong> — only you can see
-            this.
+            <strong className="font-medium">
+              {VISIBILITY_LABEL[story.status]}
+            </strong>{" "}
+            — {VISIBILITY_HINT[story.status]}
           </span>
           <Link
             href={`/write/${story.id}`}
             className="font-medium text-accent underline underline-offset-2"
           >
-            Continue editing
+            {isFrozen(story.status) ? "Manage this story" : "Continue editing"}
           </Link>
         </div>
       )}
@@ -265,7 +295,11 @@ export default async function StoryPage({
                     href={`/write/${story.id}`}
                     className="underline underline-offset-2 hover:text-foreground"
                   >
-                    Edit this story
+                    {/* Published is frozen, so this page is where you go
+                        to take it down, not to change it. */}
+                    {isFrozen(story.status)
+                      ? "Manage this story"
+                      : "Continue editing"}
                   </Link>
                 </p>
               )}

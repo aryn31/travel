@@ -2,6 +2,7 @@
  * TipTap document helpers. body_json is the source of truth; body_text is the
  * flattened copy that search and excerpts read (PLAN.md 4.2).
  */
+import { keyFromSrc, publicUrl } from "./media-url";
 export type Mark = { type: string; attrs?: Record<string, unknown> };
 export type Node = {
   type: string;
@@ -159,6 +160,45 @@ export function imageUrls(doc: unknown): string[] {
   };
   for (const node of doc.content) walk(node);
   return found;
+}
+
+/**
+ * The same document with every image `src` resolved to where the bytes
+ * actually are now.
+ *
+ * A body holds whatever URL was current when the image was inserted, so
+ * documents written before the move to Supabase still say `/api/media/…` --
+ * a route that now answers 404 for exactly those files. The reading page
+ * already resolves src to key to URL on the way out; the editor renders the
+ * attribute as stored, so it needs the same treatment on the way in or
+ * every pre-move photograph shows as a broken image while editing.
+ *
+ * Resolving rather than rewriting the stored data: a key is the durable
+ * identity and a URL is a rendering of it, so a future change of provider
+ * still needs no migration.
+ */
+export function withResolvedImages(doc: unknown): StoryDoc {
+  if (!isDoc(doc)) return EMPTY_DOC;
+
+  const fix = (node: Node): Node => {
+    const next: Node =
+      node.type === "image" && typeof node.attrs?.src === "string"
+        ? (() => {
+            const key = keyFromSrc(node.attrs.src as string);
+            // Left alone when it is not one of ours -- an external image
+            // pasted into a story is still a legitimate src.
+            return key
+              ? { ...node, attrs: { ...node.attrs, src: publicUrl(key) } }
+              : node;
+          })()
+        : node;
+
+    return next.content
+      ? { ...next, content: next.content.map(fix) }
+      : next;
+  };
+
+  return { ...doc, content: doc.content.map(fix) };
 }
 
 /**

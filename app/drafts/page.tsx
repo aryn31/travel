@@ -6,6 +6,7 @@ import { media, stories } from "@/lib/db/schema";
 import { getViewer } from "@/lib/session";
 import { publicUrl } from "@/lib/storage";
 import { excerpt } from "@/lib/story-doc";
+import { isListed, isReadable } from "@/lib/visibility";
 import { ButtonLink } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 
@@ -23,8 +24,15 @@ export default async function DraftsPage() {
     .where(eq(stories.authorId, viewer.userId))
     .orderBy(desc(stories.updatedAt));
 
-  const drafts = rows.filter((r) => r.story.status === "draft");
-  const published = rows.filter((r) => r.story.status !== "draft");
+  /*
+   * Grouped by what each state means to the author rather than by the enum:
+   * "out" is everything someone else could reach, "yours" is everything
+   * only you can. A private story belongs with the drafts in that sense,
+   * but it is labelled so it is not mistaken for one.
+   */
+  const yours = rows.filter((r) => !isReadable(r.story.status));
+  const out = rows.filter((r) => isReadable(r.story.status));
+  const published = rows.filter((r) => isListed(r.story.status));
   const handle = viewer.profile.handle;
 
   return (
@@ -33,8 +41,8 @@ export default async function DraftsPage() {
         <div>
           <h1 className="font-display text-4xl font-semibold tracking-tight">Your stories</h1>
           <p className="mt-1.5 text-sm text-muted">
-            {published.length} published · {drafts.length}{" "}
-            {drafts.length === 1 ? "draft" : "drafts"}
+            {published.length} published · {out.length - published.length}{" "}
+            unlisted · {yours.length} not shared
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -57,27 +65,37 @@ export default async function DraftsPage() {
         </div>
       ) : (
         <div className="mt-12 space-y-14">
-          <Section title="Drafts" count={drafts.length} empty="No drafts right now.">
-            {drafts.map(({ story, cover }) => (
+          <Section
+            title="Only you"
+            count={yours.length}
+            empty="No drafts right now."
+          >
+            {yours.map(({ story, cover }) => (
               <StoryRow
                 key={story.id}
                 href={`/write/${story.id}`}
                 story={story}
                 cover={cover}
+                badge={story.status === "private" ? "Private" : undefined}
               />
             ))}
           </Section>
 
           <Section
-            title="Published"
-            count={published.length}
+            title="Out there"
+            count={out.length}
             empty="Nothing published yet."
           >
-            {published.map(({ story, cover }) => (
+            {out.map(({ story, cover }) => (
               <StoryRow
                 key={story.id}
                 href={`/@${handle}/${story.slug}`}
+                badge={story.status === "unlisted" ? "Unlisted" : undefined}
                 editHref={`/write/${story.id}`}
+                /* "Edit" would be a promise this page cannot keep: a
+                   published story opens read-only and has to be unpublished
+                   first. */
+                editLabel="Manage"
                 story={story}
                 cover={cover}
               />
@@ -118,11 +136,16 @@ function Section({
 function StoryRow({
   href,
   editHref,
+  editLabel,
+  badge,
   story,
   cover,
 }: {
   href: string;
   editHref?: string;
+  editLabel?: string;
+  /** Set only where the section heading does not already say it. */
+  badge?: string;
   story: {
     title: string;
     excerpt: string;
@@ -152,8 +175,15 @@ function StoryRow({
       )}
 
       <Link href={href} className="min-w-0 flex-1">
-        <span className="block truncate font-medium group-hover:underline">
-          {story.title.trim() || "Untitled"}
+        <span className="flex items-center gap-2">
+          <span className="truncate font-medium group-hover:underline">
+            {story.title.trim() || "Untitled"}
+          </span>
+          {badge && (
+            <span className="shrink-0 rounded-full border border-rule px-1.5 py-0.5 text-[0.65rem] font-medium uppercase tracking-wider text-faint">
+              {badge}
+            </span>
+          )}
         </span>
         <span className="mt-0.5 block truncate text-sm text-muted">
           {excerpt(story.excerpt || story.bodyText, 90) || "Empty"}
@@ -169,7 +199,7 @@ function StoryRow({
           href={editHref}
           className="shrink-0 rounded-full px-3 py-1.5 text-sm text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
         >
-          Edit
+          {editLabel ?? "Edit"}
         </Link>
       )}
     </li>

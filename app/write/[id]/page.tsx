@@ -6,6 +6,8 @@ import { getViewer } from "@/lib/session";
 import { publicUrl } from "@/lib/storage";
 import { countries } from "@/lib/countries";
 import { knownPlaces } from "@/lib/places";
+import { withResolvedImages } from "@/lib/story-doc";
+import { isFrozen } from "@/lib/visibility";
 import { popularTags, tagsForStory, tagsToInput } from "@/lib/tags";
 import { Editor } from "./Editor";
 
@@ -39,12 +41,16 @@ export default async function WritePage({ params }: PageProps<"/write/[id]">) {
     <Editor
       storyId={story.id}
       initialTitle={story.title}
-      initialDoc={story.bodyJson}
+      // Pre-Supabase bodies still say /api/media/…, which now 404s.
+      initialDoc={withResolvedImages(story.bodyJson)}
       status={story.status}
+      locked={isFrozen(story.status)}
+      /* Any state but draft has a URL -- private and unlisted included.
+         Who it answers for is the story page's business, not this one's. */
       publicUrl={
-        story.status === "published"
-          ? `/@${viewer.profile.handle}/${story.slug}`
-          : null
+        story.status === "draft"
+          ? null
+          : `/@${viewer.profile.handle}/${story.slug}`
       }
       initialCover={
         cover ? { id: cover.id, url: publicUrl(cover.storageKey) } : null

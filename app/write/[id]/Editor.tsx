@@ -22,13 +22,14 @@ import { TagField } from "./TagField";
 import type { Country } from "@/lib/countries";
 import type { PlaceSuggestion } from "@/lib/places";
 import type { StoryTag } from "@/lib/tags-rules";
+import { countWords, publishBlockFor } from "@/lib/publish-rules";
+import { deleteStory, saveStory, setCover } from "../actions";
+import { VisibilityPicker } from "./VisibilityPicker";
 import {
-  deleteStory,
-  publishStory,
-  saveStory,
-  setCover,
-  unpublishStory,
-} from "../actions";
+  VISIBILITY_HINT,
+  VISIBILITY_LABEL,
+  type Visibility,
+} from "@/lib/visibility";
 
 type SaveState =
   | { kind: "clean" }
@@ -44,15 +45,12 @@ type Upload = { id: string; name: string; progress: number };
 
 const AUTOSAVE_MS = 1200;
 
-function countWords(text: string): number {
-  return text.trim().split(/\s+/).filter(Boolean).length;
-}
-
 export function Editor({
   storyId,
   initialTitle,
   initialDoc,
   status,
+  locked,
   publicUrl,
   initialCover,
   initialPlace,
@@ -65,7 +63,9 @@ export function Editor({
   storyId: string;
   initialTitle: string;
   initialDoc: unknown;
-  status: "draft" | "published" | "unlisted";
+  status: Visibility;
+  /** Published stories are frozen -- see isLocked in ../actions.ts. */
+  locked: boolean;
   publicUrl: string | null;
   initialCover: { id: string; url: string } | null;
   initialPlace: string;
@@ -132,6 +132,9 @@ export function Editor({
       Placeholder.configure({ placeholder: "Where did you go?" }),
     ],
     content: (initialDoc as object) ?? undefined,
+    // ProseMirror itself refuses the keystrokes, so there is no edit to
+    // discard and no save to refuse.
+    editable: !locked,
     editorProps: {
       attributes: {
         class: "prose-none min-h-[50vh] outline-none text-lg",
@@ -218,11 +221,12 @@ export function Editor({
   }, [editor, storyId]);
 
   const schedule = useCallback(() => {
+    if (locked) return;
     setPublishError(null);
     setSave({ kind: "dirty" });
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => void flush(), AUTOSAVE_MS);
-  }, [flush]);
+  }, [flush, locked]);
 
   async function handleFiles(files: File[]) {
     if (!editor) return;
@@ -294,16 +298,12 @@ export function Editor({
     [],
   );
 
-  async function onPublish() {
-    setPublishError(null);
-    await flush();
-    const result = await publishStory(storyId);
-    if (!result.ok) {
-      setPublishError(result.error);
-      return;
-    }
-    router.push(result.url);
-  }
+  /*
+   * The same check the server will run, so the button can say what is
+   * missing before it is pressed rather than after. Live off the word
+   * count the toolbar already tracks.
+   */
+  const blocked = publishBlockFor(title, words);
 
   return (
     <div className="page flex-1 py-10">
@@ -311,31 +311,23 @@ export function Editor({
         <div className="mb-8 flex items-center justify-between gap-4 text-sm">
           <StatusLine state={save} status={status} publicUrl={publicUrl} />
           <div className="flex items-center gap-3">
-            {status === "draft" ? (
-              <button
-                type="button"
-                onClick={() => void onPublish()}
-                disabled={pending || uploads.length > 0}
-                className="rounded-full bg-foreground px-4 py-1.5 font-medium text-background transition-opacity hover:opacity-85 disabled:opacity-40"
-              >
-                Publish
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() =>
-                  startTransition(async () => {
-                    await flush();
-                    await unpublishStory(storyId);
-                    router.refresh();
-                  })
-                }
-                disabled={pending}
-                className="rounded-full border border-rule px-4 py-1.5 transition-colors hover:bg-surface-hover disabled:opacity-40"
-              >
-                Unpublish
-              </button>
+            {/* Only when it is actually in the way: the floor applies to
+                Public and Unlisted, not to Draft or Private. */}
+            {blocked && (
+              <span className="hidden text-xs text-faint sm:inline">
+                {blocked.shortfall
+                  ? `${blocked.shortfall} more words to publish`
+                  : blocked.reason}
+              </span>
             )}
+
+            <VisibilityPicker
+              storyId={storyId}
+              status={status}
+              blockedReason={blocked?.reason}
+              onError={setPublishError}
+            />
+
             <DeleteButton storyId={storyId} disabled={pending} />
           </div>
         </div>
@@ -357,8 +349,23 @@ export function Editor({
           </p>
         )}
 
+        {locked && (
+          <div className="mb-8 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl border-2 border-dashed border-accent/40 bg-accent-soft px-4 py-3 text-sm">
+            <strong className="font-medium">
+              {status === "unlisted"
+                ? "This story is unlisted."
+                : "This story is published."}
+            </strong>
+            <span className="text-muted">
+              {VISIBILITY_HINT[status]} Set it to Private or Draft to make
+              changes — someone may already have read it, or replied to it.
+            </span>
+          </div>
+        )}
+
         <CoverPicker
           cover={cover}
+          locked={locked}
           onPick={() => coverInput.current?.click()}
           onRemove={() =>
             startTransition(async () => {
@@ -371,6 +378,7 @@ export function Editor({
 
         <div className="mb-6 rounded-xl border border-rule bg-surface/60 p-4">
           <PlaceField
+            locked={locked}
             place={place.place}
             country={place.country}
             countryList={countryList}
@@ -382,6 +390,7 @@ export function Editor({
           />
 
           <TagField
+            locked={locked}
             value={tagInput}
             suggestions={tagSuggestions}
             onChange={(next) => {
@@ -399,11 +408,12 @@ export function Editor({
             schedule();
           }}
           onBlur={() => save.kind === "dirty" && void flush()}
+          readOnly={locked}
           placeholder="Title"
           className="font-display mb-2 w-full bg-transparent text-4xl font-semibold tracking-tight outline-none placeholder:text-faint"
         />
 
-        {editor && (
+        {editor && !locked && (
           <Toolbar
             editor={editor}
             onPickImage={() => fileInput.current?.click()}
@@ -430,10 +440,12 @@ export function Editor({
           </ul>
         )}
 
-        <p className="mt-10 text-xs text-faint">
-          Drag photos in, or paste them. They&apos;re resized to 2560px before
-          upload.
-        </p>
+        {!locked && (
+          <p className="mt-10 text-xs text-faint">
+            Drag photos in, or paste them. They&apos;re resized to 2560px before
+            upload.
+          </p>
+        )}
 
         <input
           ref={fileInput}
@@ -465,13 +477,19 @@ export function Editor({
 
 function CoverPicker({
   cover,
+  locked,
   onPick,
   onRemove,
 }: {
   cover: { id: string; url: string } | null;
+  /** Published: the cover shows, the controls do not. */
+  locked?: boolean;
   onPick: () => void;
   onRemove: () => void;
 }) {
+  // Nothing to offer: a locked story with no cover is not getting one.
+  if (!cover && locked) return null;
+
   if (!cover) {
     return (
       <button
@@ -492,22 +510,24 @@ function CoverPicker({
         alt=""
         className="h-56 w-full rounded-xl object-cover"
       />
-      <div className="mt-2 flex gap-4 text-sm">
-        <button
-          type="button"
-          onClick={onPick}
-          className="underline opacity-60 hover:opacity-100"
-        >
-          Replace
-        </button>
-        <button
-          type="button"
-          onClick={onRemove}
-          className="underline opacity-60 hover:opacity-100"
-        >
-          Remove cover
-        </button>
-      </div>
+      {!locked && (
+        <div className="mt-2 flex gap-4 text-sm">
+          <button
+            type="button"
+            onClick={onPick}
+            className="underline opacity-60 hover:opacity-100"
+          >
+            Replace
+          </button>
+          <button
+            type="button"
+            onClick={onRemove}
+            className="underline opacity-60 hover:opacity-100"
+          >
+            Remove cover
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -518,9 +538,10 @@ function StatusLine({
   publicUrl,
 }: {
   state: SaveState;
-  status: string;
+  status: Visibility;
   publicUrl: string | null;
 }) {
+  // The save state while there is one, otherwise where the story stands.
   const label =
     state.kind === "saving"
       ? "Saving…"
@@ -530,9 +551,7 @@ function StatusLine({
           ? "Unsaved changes"
           : state.kind === "error"
             ? state.message
-            : status === "published"
-              ? "Published"
-              : "Draft";
+            : VISIBILITY_LABEL[status];
 
   return (
     <p
@@ -542,7 +561,9 @@ function StatusLine({
       aria-live="polite"
     >
       {label}
-      {status === "published" && publicUrl && state.kind !== "error" && (
+      {/* A private story has a URL only its author can open, which is
+          still worth offering -- it is how you look at what you made. */}
+      {status !== "draft" && publicUrl && state.kind !== "error" && (
         <>
           {" · "}
           <a href={publicUrl} className="underline hover:opacity-80">

@@ -1,0 +1,1 @@
+ALTER TYPE "public"."story_status" ADD VALUE 'private';

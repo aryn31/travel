@@ -14,11 +14,14 @@ import { MAX_PER_STORY, parseTags } from "@/lib/tags-rules";
 export function TagField({
   value,
   suggestions,
+  locked,
   onChange,
 }: {
   value: string;
   /** Tags already in use, most used first -- clicking one appends it. */
   suggestions: { slug: string; label: string }[];
+  /** Published: shown, not editable -- see isLocked in ../actions.ts. */
+  locked?: boolean;
   onChange: (next: string) => void;
 }) {
   const parsed = useMemo(() => parseTags(value), [value]);
@@ -42,7 +45,8 @@ export function TagField({
         id="story-tags"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder="solo, food, by train…"
+        readOnly={locked}
+        placeholder={locked ? "" : "solo, food, by train…"}
         className="w-full rounded-lg border border-rule bg-background px-3 py-2 text-sm outline-none transition-colors focus:border-accent"
       />
 
@@ -68,7 +72,7 @@ export function TagField({
         </p>
       )}
 
-      {suggestions.length > 0 && !full && (
+      {suggestions.length > 0 && !full && !locked && (
         <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs text-faint">
           <span>In use:</span>
           {suggestions

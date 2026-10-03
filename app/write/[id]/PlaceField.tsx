@@ -65,6 +65,7 @@ export function PlaceField({
   country,
   countryList,
   places,
+  locked,
   onChange,
 }: {
   place: string;
@@ -79,6 +80,8 @@ export function PlaceField({
   countryList: Country[];
   /** Every place already published, for the suggestions — see lib/places.ts. */
   places: PlaceSuggestion[];
+  /** Published: shown, not editable -- see isLocked in ../actions.ts. */
+  locked?: boolean;
   onChange: (next: { place: string; country: string }) => void;
 }) {
   const listId = useId();
@@ -90,7 +93,7 @@ export function PlaceField({
     () => suggest(places, place, country),
     [places, place, country],
   );
-  const showing = open && matches.length > 0;
+  const showing = open && !locked && matches.length > 0;
 
   function pick(s: PlaceSuggestion) {
     /*
@@ -158,7 +161,8 @@ export function PlaceField({
                own onMouseDown, which cancels the blur before it happens. */
             onBlur={() => setOpen(false)}
             onKeyDown={onKeyDown}
-            placeholder="Naples, Busan, Cape Coast…"
+            readOnly={locked}
+            placeholder={locked ? "" : "Naples, Busan, Cape Coast…"}
             maxLength={120}
             autoComplete="off"
             role="combobox"
@@ -222,6 +226,7 @@ export function PlaceField({
             id="place-country"
             value={country}
             onChange={(e) => onChange({ place, country: e.target.value })}
+            disabled={locked}
             className="w-full rounded-lg border border-rule bg-background px-3 py-2 text-sm outline-none transition-colors focus:border-accent"
           >
             <option value="">—</option>

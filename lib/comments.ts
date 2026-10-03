@@ -1,4 +1,4 @@
-import { and, asc, eq, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "./db";
 import { comments, profiles, stories } from "./db/schema";
 
@@ -101,8 +101,7 @@ export async function listComments(
 /**
  * Stores a comment and refreshes the story's cached count.
  *
- * Returns null if the story does not exist or is not published -- a draft
- * has no readers, so a comment on one arrived by guessing an id.
+ * Returns null if the story is not one anyone else can reach.
  */
 export async function addComment({
   storyId,
@@ -115,10 +114,20 @@ export async function addComment({
   body: string;
   parentId?: string | null;
 }): Promise<string | null> {
+  /*
+   * Unlisted counts: someone holding the link can read it, so they can
+   * reply to it. Drafts and private stories have no audience but their
+   * author, so a comment on one arrived by guessing an id.
+   */
   const [story] = await db
     .select({ id: stories.id })
     .from(stories)
-    .where(and(eq(stories.id, storyId), eq(stories.status, "published")))
+    .where(
+      and(
+        eq(stories.id, storyId),
+        inArray(stories.status, ["published", "unlisted"]),
+      ),
+    )
     .limit(1);
   if (!story) return null;
 
