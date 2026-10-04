@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { headers } from "next/headers";
 import type { Metadata } from "next";
 import { Caveat, Fraunces, Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
@@ -50,7 +51,11 @@ export const metadata: Metadata = {
   description: "Long-form travel stories, told properly.",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  /* Set by proxy.ts, one per request. Next nonces its own scripts from the
+     CSP header automatically; this one is ours, so it needs it by hand. */
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
+
   return (
     <html
       lang="en"
@@ -67,7 +72,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           snaps to dark once React mounts -- the flash every hand-rolled
           theme switcher starts with. Inline and synchronous on purpose.
         */}
+        {/* The nonce the proxy minted for this request. Without it the
+            CSP blocks this script and the page renders light before
+            snapping to dark -- the flash this script exists to prevent. */}
         <script
+          nonce={nonce}
           dangerouslySetInnerHTML={{
             __html: `(function(){try{var t=localStorage.getItem('theme');var d=t==='dark'||((!t||t==='system')&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=d?'dark':'light';document.documentElement.classList.add('js');}catch(e){document.documentElement.dataset.theme='light';}})();`,
           }}
