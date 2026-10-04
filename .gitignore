@@ -55,3 +55,7 @@ next-env.d.ts
 # session tokens included -- so they must never be committed.
 *.dump
 *.sql.gz
+
+# Written by `npm run admin:create`. A password on disk -- move it to a
+# password manager and delete it.
+.admin-credentials

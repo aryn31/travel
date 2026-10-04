@@ -75,6 +75,7 @@ export function Comments({
                 storyId={storyId}
                 path={path}
                 canReply={canWrite}
+                signedIn={signedIn}
               />
             ))}
           </ul>

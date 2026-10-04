@@ -1,6 +1,7 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "./db";
 import { likes, stories } from "./db/schema";
+import { notify } from "./notifications";
 
 /**
  * Liking a story.
@@ -30,7 +31,7 @@ export async function toggleLike(
   storyId: string,
   userId: string,
 ): Promise<LikeState> {
-  return db.transaction(async (tx) => {
+  const state = await db.transaction(async (tx) => {
     const [existing] = await tx
       .select({ userId: likes.userId })
       .from(likes)
@@ -57,8 +58,33 @@ export async function toggleLike(
       .where(eq(stories.id, storyId))
       .returning({ count: stories.likeCount });
 
-    return { liked: !existing, count: row?.count ?? 0 };
+    const [owner] = await tx
+      .select({ authorId: stories.authorId })
+      .from(stories)
+      .where(eq(stories.id, storyId))
+      .limit(1);
+
+    return { liked: !existing, count: row?.count ?? 0, authorId: owner?.authorId };
   });
+
+  /*
+   * After the transaction, not inside it. The like is the thing that has
+   * to be durable; telling someone about it is a side effect, and holding
+   * a database transaction open across an insert nobody is waiting for is
+   * how a fast action becomes a slow one.
+   *
+   * Only on the way up. Unliking is not news.
+   */
+  if (state.liked && state.authorId) {
+    await notify({
+      userId: state.authorId,
+      actorId: userId,
+      kind: "like",
+      storyId,
+    });
+  }
+
+  return { liked: state.liked, count: state.count };
 }
 
 /** Whether this viewer has liked this story. */

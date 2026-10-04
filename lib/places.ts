@@ -59,7 +59,7 @@ export async function knownPlaces(limit = 300): Promise<PlaceSuggestion[]> {
       count: sql<number>`count(*)::int`.as("count"),
     })
     .from(stories)
-    .where(sql`${stories.status} = 'published' and ${hasPlace}`)
+    .where(sql`${stories.status} = 'published' and ${stories.removedAt} is null and ${hasPlace}`)
     /*
      * By country as well as by name: Naples in Italy and Naples in Florida
      * are two places that happen to share a word, and merging them would
@@ -86,7 +86,7 @@ export async function canonicalPlaceName(typed: string): Promise<string> {
     .select({ name: sql<string>`${canonicalName}` })
     .from(stories)
     .where(
-      sql`${stories.status} = 'published'
+      sql`${stories.status} = 'published' and ${stories.removedAt} is null
           and lower(${stories.placeName}) = lower(${name})`,
     )
     .groupBy(sql`lower(${stories.placeName})`)

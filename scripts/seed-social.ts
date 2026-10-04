@@ -1,7 +1,18 @@
 // Env comes from --env-file (see the npm script).
-import { eq, inArray, like, sql } from "drizzle-orm";
+import { and, eq, inArray, like, sql } from "drizzle-orm";
 import { db } from "../lib/db";
-import { comments, likes, profiles, stories, storyTags, tags, users } from "../lib/db/schema";
+import {
+  collections,
+  collectionStories,
+  comments,
+  likes,
+  profiles,
+  stories,
+  storyTags,
+  tags,
+  users,
+} from "../lib/db/schema";
+import { slugify } from "../lib/slug";
 import { parseTags, setStoryTags } from "../lib/tags";
 import { SEED_DOMAIN } from "./seed-config";
 import { requireLocalDatabase } from "./guard";
@@ -73,6 +84,40 @@ const THREADS: Record<string, { by: string; says: string; replies?: { by: string
   ],
 };
 
+/**
+ * Trips, as ordered runs of one writer's stories.
+ *
+ * Keyed by the owner's handle. The order in the array is the order on the
+ * page, which is the whole point of the feature.
+ */
+const TRIPS: {
+  by: string;
+  title: string;
+  description: string;
+  stories: string[];
+}[] = [
+  {
+    by: "mira",
+    title: "West Africa by road",
+    description:
+      "Accra to Ouidah without flying, and the people who turned out to be the reason for it.",
+    stories: [
+      "The Wedding I Wasn't Invited To",
+      "Eleven Days Down the Coast",
+      "Learning to Fry Plantain Properly, at Forty-One",
+    ],
+  },
+  {
+    by: "ellis",
+    title: "Wet weeks in the hills",
+    description: "Two ranges, four days of rain, and better company than the forecast deserved.",
+    stories: [
+      "Five of Us in a Bothy in the Rain",
+      "The Man Who Walked With Me for Six Miles",
+    ],
+  },
+];
+
 /** Likes, per story, as a count of seeded readers rather than a flat number. */
 const LIKES: Record<string, number> = {
   "Eleven Days Down the Coast": 4,
@@ -102,8 +147,15 @@ async function clear() {
   await db.delete(storyTags);
   await db.delete(tags);
 
+  if (ids.length > 0) {
+    // collection_stories goes with it by cascade.
+    await db.delete(collections).where(inArray(collections.ownerId, ids));
+  }
+
   await db.update(stories).set({ likeCount: 0, commentCount: 0 });
-  console.log(`  cleared likes and comments from ${ids.length} seeded accounts, and all tags`);
+  console.log(
+    `  cleared likes, comments and trips from ${ids.length} seeded accounts, and all tags`,
+  );
 }
 
 async function main() {
@@ -199,7 +251,52 @@ async function main() {
                          and ${comments.deletedAt} is null)`,
   });
 
-  console.log(`  ${tagged} stories tagged, ${liked} likes, ${said} comments`);
+  /*
+   * Trips last: they reference stories by title, so everything else has
+   * to exist first. Skipped rather than duplicated when one already has
+   * the name, so a re-run is idempotent.
+   */
+  let trips = 0;
+  for (const trip of TRIPS) {
+    const ownerId = byHandle.get(trip.by);
+    if (!ownerId) continue;
+
+    const slug = slugify(trip.title);
+    const [exists] = await db
+      .select({ id: collections.id })
+      .from(collections)
+      .where(and(eq(collections.ownerId, ownerId), eq(collections.slug, slug)))
+      .limit(1);
+    if (exists) continue;
+
+    const [made] = await db
+      .insert(collections)
+      .values({
+        ownerId,
+        slug,
+        title: trip.title,
+        description: trip.description,
+        status: "published",
+        publishedAt: new Date(),
+      })
+      .returning({ id: collections.id });
+
+    const members = trip.stories
+      .map((title, position) => {
+        const story = rows.find((r) => r.title === title && r.authorId === ownerId);
+        return story ? { collectionId: made.id, storyId: story.id, position } : null;
+      })
+      .filter((m) => m !== null);
+
+    if (members.length > 0) {
+      await db.insert(collectionStories).values(members).onConflictDoNothing();
+      trips++;
+    }
+  }
+
+  console.log(
+    `  ${tagged} stories tagged, ${liked} likes, ${said} comments, ${trips} trips`,
+  );
   process.exit(0);
 }
 

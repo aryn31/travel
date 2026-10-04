@@ -6,6 +6,8 @@ import { Avatar } from "@/components/ui/Avatar";
 import { deleteCommentAction } from "@/app/[handle]/[slug]/actions";
 import type { CommentNode } from "@/lib/comments-types";
 import { CommentForm } from "./CommentForm";
+import { ReportButton } from "@/components/report/ReportButton";
+import { RoleBadge } from "@/components/ui/RoleBadge";
 
 /**
  * One comment and whatever came back.
@@ -20,12 +22,14 @@ export function CommentThread({
   storyId,
   path,
   canReply,
+  signedIn,
   depth = 0,
 }: {
   comment: CommentNode;
   storyId: string;
   path: string;
   canReply: boolean;
+  signedIn: boolean;
   depth?: number;
 }) {
   const [replying, setReplying] = useState(false);
@@ -68,6 +72,7 @@ export function CommentThread({
               >
                 {comment.author!.displayName}
               </Link>
+              <RoleBadge role={comment.author!.role} size="sm" />
               <span aria-hidden className="text-faint">·</span>
               <time
                 dateTime={comment.createdAt.toISOString()}
@@ -108,6 +113,15 @@ export function CommentThread({
                   {pending ? "Removing…" : "Remove"}
                 </button>
               )}
+              {/* Not on your own, and not when you can already remove it --
+                  reporting something you have power over is a detour. */}
+              {!comment.mine && !comment.canDelete && (
+                <ReportButton
+                  target={{ kind: "comment", id: comment.id }}
+                  alreadyReported={comment.reported}
+                  signedIn={signedIn}
+                />
+              )}
             </div>
           </>
         )}
@@ -135,6 +149,7 @@ export function CommentThread({
                 storyId={storyId}
                 path={path}
                 canReply={canReply}
+                signedIn={signedIn}
                 depth={depth + 1}
               />
             ))}

@@ -3,7 +3,7 @@ import { desc, eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { media, stories } from "@/lib/db/schema";
-import { getViewer } from "@/lib/session";
+import { getViewer, isModerator } from "@/lib/session";
 import { publicUrl } from "@/lib/storage";
 import { excerpt } from "@/lib/story-doc";
 import { isListed, isReadable } from "@/lib/visibility";
@@ -16,6 +16,11 @@ export default async function DraftsPage() {
   const viewer = await getViewer();
   if (!viewer) redirect("/signin");
   if (!viewer.profile) redirect("/onboarding");
+  /* Staff accounts do not write -- see isModerator in lib/session.ts. A
+     redirect rather than a 404: the page plainly exists, it is just not
+     this account's business, and sending them where they belong is more
+     use than pretending otherwise. */
+  if (isModerator(viewer)) redirect("/admin");
 
   const rows = await db
     .select({ story: stories, cover: media })

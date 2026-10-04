@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { media, profiles, stories } from "@/lib/db/schema";
+import { media, profiles, stories, users } from "@/lib/db/schema";
 import { getViewer } from "@/lib/session";
 import { publicUrl } from "@/lib/storage";
+import { listFor } from "@/lib/collections";
 import { StoryList } from "@/components/StoryList";
+import { TripStrip } from "@/components/TripStrip";
 import { ProfileHeader } from "@/components/ProfileHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
 
@@ -13,19 +15,23 @@ async function loadProfile(segment: string) {
   const raw = decodeURIComponent(segment);
   if (!raw.startsWith("@")) return null;
 
-  const [profile] = await db
-    .select()
+  // The role rides along from `users`: it is shown on the page, and a
+  // second query for one column on every profile view is waste.
+  const [row] = await db
+    .select({ profile: profiles, role: users.role })
     .from(profiles)
+    .innerJoin(users, eq(users.id, profiles.userId))
     .where(sql`lower(${profiles.handle}) = ${raw.slice(1).toLowerCase()}`)
     .limit(1);
 
-  return profile ?? null;
+  return row ?? null;
 }
 
 export async function generateMetadata({ params }: PageProps<"/[handle]">) {
   const { handle } = await params;
-  const profile = await loadProfile(handle);
-  if (!profile) return {};
+  const row = await loadProfile(handle);
+  if (!row) return {};
+  const profile = row.profile;
   return {
     title: profile.displayName,
     description: profile.bio ?? `Travel stories by @${profile.handle} on Wendfolk.`,
@@ -64,10 +70,15 @@ export default async function ProfilePage({ params }: PageProps<"/[handle]">) {
     redirect(`/signin?next=${encodeURIComponent(`/${raw}`)}`);
   }
 
-  const profile = await loadProfile(handle);
-  if (!profile) notFound();
+  const loaded = await loadProfile(handle);
+  if (!loaded) notFound();
+  const { profile, role } = loaded;
 
   const isMe = viewer.userId === profile.userId;
+
+  // A visitor sees only what the owner has shared; the owner sees the
+  // shelf on /collections, so this stays the public view either way.
+  const trips = await listFor(profile.userId, true);
 
   const rows = await db
     .select({
@@ -93,7 +104,7 @@ export default async function ProfilePage({ params }: PageProps<"/[handle]">) {
     .where(
       and(
         eq(stories.authorId, profile.userId),
-        eq(stories.status, "published"),
+        and(eq(stories.status, "published"), isNull(stories.removedAt)),
       ),
     )
     .orderBy(desc(stories.publishedAt));
@@ -118,10 +129,18 @@ export default async function ProfilePage({ params }: PageProps<"/[handle]">) {
         profile={profile}
         stats={{ stories: published.length, countries, minutes }}
         isMe={isMe}
+        role={role}
       />
 
       <div className="page py-10 pb-24">
-        {published.length === 0 ? (
+        {published.length === 0 && role !== "user" ? (
+          /* No "write your first story" for an account that is not
+             supposed to write one. */
+          <EmptyState title="Not a writing account">
+            This account administers Wendfolk. Its work is keeping the place
+            in order, which does not leave much to read.
+          </EmptyState>
+        ) : published.length === 0 ? (
           <EmptyState title={isMe ? "Nothing published yet" : "No stories yet"}>
             {isMe ? (
               <>
@@ -141,6 +160,8 @@ export default async function ProfilePage({ params }: PageProps<"/[handle]">) {
                 hierarchy the home page uses, so a profile does not read as
                 an undifferentiated list of everything. */}
             <StoryList stories={[newest]} showAuthor={false} featured />
+
+            <TripStrip trips={trips} />
 
             {rest.length > 0 && (
               <section className="mt-16">

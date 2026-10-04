@@ -10,6 +10,7 @@ import {
   index,
   primaryKey,
   uniqueIndex,
+  check,
   customType,
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
@@ -282,6 +283,18 @@ export const stories = pgTable(
     status: storyStatus("status").notNull().default("draft"),
     publishedAt: timestamp("published_at"),
 
+    /*
+     * Taken down by a moderator. Deliberately not a fifth `status`: the
+     * status is the author's choice and this is somebody else's, so
+     * folding the two together would let an author set themselves back to
+     * Public and undo it. Removed outranks every status; the author keeps
+     * the row and can read it, and nobody else can reach it at all.
+     */
+    removedAt: timestamp("removed_at"),
+    removedBy: text("removed_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+
     readingMinutes: integer("reading_minutes").notNull().default(0),
     likeCount: integer("like_count").notNull().default(0),
     commentCount: integer("comment_count").notNull().default(0),
@@ -436,3 +449,347 @@ export const storyTags = pgTable(
     index("story_tags_tag_idx").on(t.tagId),
   ],
 );
+
+/* ------------------------------------------------------------------ *
+ * Reports
+ * ------------------------------------------------------------------ */
+
+export const reportReason = pgEnum("report_reason", [
+  "spam",
+  "abuse",
+  "copyright",
+  "other",
+]);
+
+export const reportStatus = pgEnum("report_status", [
+  "open",
+  "upheld",
+  "dismissed",
+]);
+
+/**
+ * Somebody flagging something that is not theirs.
+ *
+ * Until now the only moderator was the author of the story a comment sat
+ * on -- which answers nothing when the thing being complained about is the
+ * story, or when the author is the problem. This is the queue that sits
+ * above them.
+ *
+ * The target is two nullable foreign keys rather than a type/id pair:
+ * real references mean a deleted story takes its reports with it, which a
+ * polymorphic id column cannot do.
+ */
+export const reports = pgTable(
+  "reports",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    reporterId: text("reporter_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+
+    storyId: text("story_id").references(() => stories.id, {
+      onDelete: "cascade",
+    }),
+    commentId: text("comment_id").references(() => comments.id, {
+      onDelete: "cascade",
+    }),
+    collectionId: text("collection_id").references(() => collections.id, {
+      onDelete: "cascade",
+    }),
+
+    reason: reportReason("reason").notNull(),
+    /** Optional, and the only free text here. */
+    detail: text("detail"),
+
+    status: reportStatus("status").notNull().default("open"),
+    resolvedBy: text("resolved_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    resolvedAt: timestamp("resolved_at"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    // The queue's own query: what is still open, oldest first.
+    index("reports_status_idx").on(t.status, t.createdAt),
+    /*
+     * One report per person per thing. Without this, a report button is a
+     * counter anyone can run up, and the queue fills with the same
+     * complaint from the same account.
+     */
+    uniqueIndex("reports_one_per_story_idx")
+      .on(t.reporterId, t.storyId)
+      .where(sql`${t.storyId} is not null`),
+    uniqueIndex("reports_one_per_comment_idx")
+      .on(t.reporterId, t.commentId)
+      .where(sql`${t.commentId} is not null`),
+    uniqueIndex("reports_one_per_collection_idx")
+      .on(t.reporterId, t.collectionId)
+      .where(sql`${t.collectionId} is not null`),
+    /*
+     * Exactly one target of three. A report about nothing, or about two
+     * things at once, is a bug that should not be storable -- and with
+     * three nullable columns the `<>` trick no longer works, so the count
+     * is spelled out.
+     */
+    check(
+      "reports_one_target",
+      sql`(
+        (case when ${t.storyId} is null then 0 else 1 end)
+        + (case when ${t.commentId} is null then 0 else 1 end)
+        + (case when ${t.collectionId} is null then 0 else 1 end)
+      ) = 1`,
+    ),
+  ],
+);
+
+export type Report = typeof reports.$inferSelect;
+
+/* ------------------------------------------------------------------ *
+ * Collections
+ * ------------------------------------------------------------------ */
+
+/**
+ * An ordered run of stories: a trip, a theme, a year.
+ *
+ * A two-week journey is naturally five or six pieces rather than one
+ * 4,000-word slab, but published separately they arrive out of order and
+ * nothing says they belong together. This is the thing that says so.
+ *
+ * Reuses `story_status` rather than declaring its own: a collection
+ * answers exactly the same two questions a story does -- can anyone else
+ * open it, and is it listed -- so lib/visibility.ts applies unchanged.
+ */
+export const collections = pgTable(
+  "collections",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    ownerId: text("owner_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+
+    slug: text("slug").notNull(),
+    title: text("title").notNull().default(""),
+    /** Why these belong together. Shown above the list. */
+    description: text("description"),
+
+    status: storyStatus("status").notNull().default("draft"),
+    publishedAt: timestamp("published_at"),
+
+    /*
+     * Taken down by a moderator, exactly as on `stories` and for the same
+     * reason: status is the owner's choice and this is somebody else's.
+     * A trip has a title and a description of its own, so it is user text
+     * that can need removing even when every story in it is fine.
+     */
+    removedAt: timestamp("removed_at"),
+    removedBy: text("removed_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    // Per owner, like story slugs: the URL is /@handle/trips/slug, so two
+    // people can both have a "patagonia".
+    uniqueIndex("collections_owner_slug_idx").on(t.ownerId, t.slug),
+    index("collections_owner_idx").on(t.ownerId, t.updatedAt.desc()),
+  ],
+);
+
+export type Collection = typeof collections.$inferSelect;
+
+/**
+ * Which stories, and in what order.
+ *
+ * `position` is a plain integer rewritten whenever the order changes. A
+ * collection is a handful of stories, not a thousand, so the clever
+ * fractional-index schemes buy nothing here and cost a lot of reading.
+ *
+ * Deliberately not unique on (collection, position): reordering would then
+ * need a deferred constraint or a temporary value to shuffle through, and
+ * a duplicate position only means two stories tie -- which the next
+ * reorder fixes.
+ */
+export const collectionStories = pgTable(
+  "collection_stories",
+  {
+    collectionId: text("collection_id")
+      .notNull()
+      .references(() => collections.id, { onDelete: "cascade" }),
+    storyId: text("story_id")
+      .notNull()
+      .references(() => stories.id, { onDelete: "cascade" }),
+    position: integer("position").notNull().default(0),
+  },
+  (t) => [
+    primaryKey({ columns: [t.collectionId, t.storyId] }),
+    index("collection_stories_order_idx").on(t.collectionId, t.position),
+    // "Which collections is this story in" -- the story page asks it on
+    // every read, and the primary key is collection-first.
+    index("collection_stories_story_idx").on(t.storyId),
+  ],
+);
+
+/* ------------------------------------------------------------------ *
+ * Saves
+ * ------------------------------------------------------------------ */
+
+/**
+ * Keeping something to read later.
+ *
+ * Private by construction: nobody is told what anyone else has saved, and
+ * there is no count anywhere. A like is a public signal to the writer; a
+ * save is a note to yourself, and conflating the two would make people
+ * think twice about both.
+ *
+ * Two nullable targets with a check constraint, the same shape as
+ * `reports` -- real foreign keys mean a deleted story takes its saves with
+ * it, which a polymorphic id column cannot do.
+ */
+export const saves = pgTable(
+  "saves",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+
+    storyId: text("story_id").references(() => stories.id, {
+      onDelete: "cascade",
+    }),
+    collectionId: text("collection_id").references(() => collections.id, {
+      onDelete: "cascade",
+    }),
+
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    // The list's own query: what this person saved, most recent first.
+    index("saves_user_idx").on(t.userId, t.createdAt.desc()),
+    // Saving twice is not a thing that can happen.
+    uniqueIndex("saves_one_per_story_idx")
+      .on(t.userId, t.storyId)
+      .where(sql`${t.storyId} is not null`),
+    uniqueIndex("saves_one_per_collection_idx")
+      .on(t.userId, t.collectionId)
+      .where(sql`${t.collectionId} is not null`),
+    check(
+      "saves_one_target",
+      sql`(${t.storyId} is null) <> (${t.collectionId} is null)`,
+    ),
+  ],
+);
+
+export type Save = typeof saves.$inferSelect;
+
+/* ------------------------------------------------------------------ *
+ * Notifications
+ * ------------------------------------------------------------------ */
+
+export const notificationKind = pgEnum("notification_kind", [
+  "like",
+  "comment",
+  "reply",
+  /*
+   * A moderator took something down, or put it back.
+   *
+   * Nobody should find out that their work has vanished by noticing the
+   * gap. These two exist so the one person most affected by a removal is
+   * the one person certain to be told about it.
+   */
+  "removed",
+  "restored",
+]);
+
+/**
+ * Telling a writer that something happened while they were not looking.
+ *
+ * Twenty-three likes and seven comments existed on this site before this
+ * table did, and not one person had been told about any of them. That is
+ * the whole argument for it.
+ *
+ * Written on the spot rather than derived from `likes` and `comments` on
+ * read: a notification has its own read/unread state, and deriving one
+ * means recomputing "what is new since you last looked" on every page
+ * load for everybody.
+ */
+export const notifications = pgTable(
+  "notifications",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+
+    /** Who is being told. */
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** Who did it. Null once that account is gone; the event still happened. */
+    actorId: text("actor_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+
+    kind: notificationKind("kind").notNull(),
+
+    storyId: text("story_id").references(() => stories.id, {
+      onDelete: "cascade",
+    }),
+    commentId: text("comment_id").references(() => comments.id, {
+      onDelete: "cascade",
+    }),
+    collectionId: text("collection_id").references(() => collections.id, {
+      onDelete: "cascade",
+    }),
+
+    readAt: timestamp("read_at"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("notifications_user_idx").on(t.userId, t.createdAt.desc()),
+    /*
+     * One like notification per person per story, ever.
+     *
+     * Unliking and liking again is a thing people do by accident, and
+     * three identical lines saying the same person liked the same story is
+     * how an inbox becomes something to ignore. Comments get no such index
+     * -- each one is a different thing said.
+     */
+    uniqueIndex("notifications_one_like_idx")
+      .on(t.userId, t.actorId, t.storyId)
+      .where(sql`${t.kind} = 'like'`),
+  ],
+);
+
+export type Notification = typeof notifications.$inferSelect;
+
+/* ------------------------------------------------------------------ *
+ * Account deletion
+ * ------------------------------------------------------------------ */
+
+/**
+ * A deletion waiting on a code.
+ *
+ * Deleting an account is the one action on this site that cannot be
+ * undone, so it is the one that asks you to prove you are holding the
+ * email address as well as the session. A stolen laptop with a signed-in
+ * browser should not be able to erase somebody's writing.
+ *
+ * Keyed by user, so asking twice replaces the first code rather than
+ * leaving two live.
+ */
+export const accountDeletions = pgTable("account_deletions", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  codeHash: text("code_hash").notNull(),
+  attempts: integer("attempts").notNull().default(0),
+  expires: timestamp("expires", { mode: "date" }).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});

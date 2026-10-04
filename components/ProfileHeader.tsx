@@ -2,6 +2,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { publicUrl } from "@/lib/media-url";
 import { flagFor } from "@/components/ui/PlaceMark";
 import { ButtonLink } from "@/components/ui/Button";
+import type { Role } from "@/components/ui/RoleBadge";
 import type { Profile } from "@/lib/db/schema";
 
 /**
@@ -68,11 +69,22 @@ export function ProfileHeader({
   profile,
   stats,
   isMe,
+  role,
 }: {
   profile: Profile;
   stats: ProfileStats;
   isMe: boolean;
+  /** Shown publicly: a reader deserves to know who can remove their comment. */
+  role: Role;
 }) {
+  /*
+   * A staff account that has never published is not a writer with nothing
+   * to show -- it is the site itself. Counting its stories, dating its
+   * membership and inviting it to write its first story all describe
+   * somebody it is not.
+   */
+  const staff = role !== "user" && stats.stories === 0;
+
   const hue = hueFor(profile.handle);
   const hasCover = Boolean(profile.coverKey);
   const site = profile.website
@@ -132,8 +144,16 @@ export function ProfileHeader({
             <h1 className="font-display mt-6 text-balance text-5xl font-semibold leading-[1.02] tracking-tight sm:text-6xl">
               {profile.displayName}
             </h1>
-            <p className="mt-2 text-lg font-medium text-background/70">
+            <p className="mt-2 flex items-center gap-2.5 text-lg font-medium text-background/70">
               @{profile.handle}
+              {/* On the saturated band the badge's own plum would vanish,
+                  so it is knocked out of the page colour like the rest of
+                  the type here. */}
+              {role !== "user" && (
+                <span className="inline-flex items-center rounded-md border border-background/40 bg-background/15 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wider text-background">
+                  {role}
+                </span>
+              )}
             </p>
 
             {profile.bio && (
@@ -192,11 +212,27 @@ export function ProfileHeader({
                 saturated ground. */}
             {isMe && (
               <div className="mb-5 flex flex-wrap items-center gap-2">
-                <OwnerLink href="/settings">Edit profile</OwnerLink>
-                <OwnerLink href="/drafts">Your stories</OwnerLink>
+                {/* Nothing to edit on a site account -- see app/settings. */}
+                {staff ? (
+                  <>
+                    <OwnerLink href="/admin">Back office</OwnerLink>
+                    <OwnerLink href="/settings">Password</OwnerLink>
+                  </>
+                ) : (
+                  <>
+                    <OwnerLink href="/settings">Edit profile</OwnerLink>
+                    <OwnerLink href="/drafts">Your stories</OwnerLink>
+                  </>
+                )}
               </div>
             )}
 
+            {staff ? (
+              <p className="rounded-2xl border-2 border-background/25 bg-background/10 p-6 text-background/90 backdrop-blur-sm">
+                A Wendfolk account. It keeps the site in order rather than
+                writing for it.
+              </p>
+            ) : (
             <div className="rounded-2xl border-2 border-background/25 bg-background/10 p-6 backdrop-blur-sm">
               {/* The numbers, set as numbers. "3 stories" in grey body text
                   is a fact nobody reads; the figure at display size is the
@@ -250,6 +286,7 @@ export function ProfileHeader({
                 </div>
               )}
             </div>
+            )}
           </div>
         </div>
       </div>

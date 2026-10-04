@@ -36,3 +36,22 @@ export async function getViewer(): Promise<Viewer | null> {
     profile: row.profile,
   };
 }
+
+/**
+ * The viewer, if they are allowed to moderate.
+ *
+ * `users.role` has existed since the first migration with nothing reading
+ * it. This is what makes it mean something. Editors and admins are both
+ * moderators; the distinction is kept for later -- an editor curating the
+ * home page is a different job from an admin removing an account.
+ */
+export async function getModerator(): Promise<Viewer | null> {
+  const viewer = await getViewer();
+  if (!viewer) return null;
+  return viewer.role === "admin" || viewer.role === "editor" ? viewer : null;
+}
+
+export function isModerator(viewer: Viewer | null): boolean {
+  return viewer?.role === "admin" || viewer?.role === "editor";
+}
+

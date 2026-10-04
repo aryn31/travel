@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getViewer } from "@/lib/session";
+import { getViewer, isModerator } from "@/lib/session";
 import { Button } from "@/components/ui/Button";
 import { createDraft } from "./actions";
 
@@ -9,6 +9,11 @@ export default async function NewStoryPage() {
   const viewer = await getViewer();
   if (!viewer) redirect("/signin");
   if (!viewer.profile) redirect("/onboarding");
+  /* Staff accounts do not write -- see isModerator in lib/session.ts. A
+     redirect rather than a 404: the page plainly exists, it is just not
+     this account's business, and sending them where they belong is more
+     use than pretending otherwise. */
+  if (isModerator(viewer)) redirect("/admin");
 
   return (
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center px-6 py-20">

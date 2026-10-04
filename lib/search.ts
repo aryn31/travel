@@ -169,7 +169,7 @@ function taggedWith(slug: string): SQL {
 }
 
 function conditions(query: Query) {
-  const where: SQL[] = [sql`${stories.status} = 'published'`];
+  const where: SQL[] = [sql`${stories.status} = 'published' and ${stories.removedAt} is null`];
   if (query.q) where.push(matches(query.q));
   if (query.country) where.push(sql`${stories.countryCode} = ${query.country}`);
   if (query.city) where.push(inCity(query.city));
@@ -320,7 +320,7 @@ export async function matchingWriters(query: Query) {
     .from(profiles)
     .innerJoin(
       stories,
-      sql`${stories.authorId} = ${profiles.userId} and ${stories.status} = 'published'`,
+      sql`${stories.authorId} = ${profiles.userId} and ${stories.status} = 'published' and ${stories.removedAt} is null`,
     )
     .where(
       sql`(
@@ -341,7 +341,7 @@ export async function matchingWriters(query: Query) {
  * the counts describe what is actually reachable.
  */
 export async function countryFacets(query: Query) {
-  const where: SQL[] = [sql`${stories.status} = 'published'`];
+  const where: SQL[] = [sql`${stories.status} = 'published' and ${stories.removedAt} is null`];
   if (query.q) where.push(matches(query.q));
   /* The tag narrows this row; the country and city deliberately do not.
      Applying the country would collapse the row to the one chip already
@@ -375,7 +375,7 @@ export async function countryFacets(query: Query) {
 export async function cityFacets(query: Query) {
   if (!query.country && !query.q) return [];
 
-  const where: SQL[] = [sql`${stories.status} = 'published'`];
+  const where: SQL[] = [sql`${stories.status} = 'published' and ${stories.removedAt} is null`];
   if (query.q) where.push(matches(query.q));
   if (query.country) where.push(sql`${stories.countryCode} = ${query.country}`);
   if (query.tag) where.push(taggedWith(query.tag));
@@ -405,7 +405,7 @@ export async function cityFacets(query: Query) {
  * rule the country and city facets follow.
  */
 export async function tagFacetsFor(query: Query) {
-  const where: SQL[] = [sql`${stories.status} = 'published'`];
+  const where: SQL[] = [sql`${stories.status} = 'published' and ${stories.removedAt} is null`];
   if (query.q) where.push(matches(query.q));
   if (query.country) where.push(sql`${stories.countryCode} = ${query.country}`);
   if (query.city) where.push(inCity(query.city));

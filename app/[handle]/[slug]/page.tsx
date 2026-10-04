@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { media, profiles, stories } from "@/lib/db/schema";
-import { getViewer } from "@/lib/session";
+import { getViewer, isModerator } from "@/lib/session";
 import {
   isFrozen,
   isListed,
@@ -16,10 +16,17 @@ import { excerpt, hasMoreThanOpening, openingOf } from "@/lib/story-doc";
 import { METER_HEADER } from "@/lib/meter";
 import { publicUrl } from "@/lib/storage";
 import { hasLiked } from "@/lib/likes";
+import { isSaved } from "@/lib/saves";
+import { alreadyReported } from "@/lib/reports";
+import { placementsOf } from "@/lib/collections";
+import { TripNav } from "@/components/TripNav";
+import { TripAside } from "@/components/TripAside";
+import { ReportButton } from "@/components/report/ReportButton";
 import { listComments } from "@/lib/comments";
 import { tagsForStory } from "@/lib/tags";
 import { StoryBody } from "@/components/StoryBody";
 import { LikeButton } from "@/components/LikeButton";
+import { SaveButton } from "@/components/SaveButton";
 import { Comments } from "@/components/comments/Comments";
 import { TagChip } from "@/components/ui/TagChip";
 import { ReadWall } from "@/components/ReadWall";
@@ -66,7 +73,10 @@ export async function generateMetadata({
      * any other way -- being crawled would undo the only thing the state
      * is for. Drafts and private stories are the author's alone.
      */
-    robots: isListed(row.story.status) ? undefined : { index: false, follow: false },
+    robots:
+      isListed(row.story.status) && !row.story.removedAt
+        ? undefined
+        : { index: false, follow: false },
   };
 }
 
@@ -88,6 +98,15 @@ export default async function StoryPage({
    * purpose.
    */
   if (!isAuthor && !isReadable(story.status)) notFound();
+
+  /*
+   * Taken down by a moderator. The author keeps the row and can still read
+   * it -- so they can see what was removed and appeal -- and so can a
+   * moderator, who otherwise could not review their own decision. Gone for
+   * everyone else, whatever its status says.
+   */
+  const maySeeRemoved = isAuthor || isModerator(viewer);
+  if (!maySeeRemoved && story.removedAt) notFound();
 
   /*
    * The free-read meter. proxy.ts counts the read and reports what the
@@ -122,11 +141,17 @@ export default async function StoryPage({
    * Likes and comments need somebody other than the author able to reach
    * the page. A private story has an audience of one, and a draft none.
    */
-  const live = isReadable(story.status);
-  const [liked, comments, storyTagList] = await Promise.all([
+  const live = isReadable(story.status) && !story.removedAt;
+  const [liked, saved, comments, storyTagList, reported, placements] =
+    await Promise.all([
     live ? hasLiked(story.id, viewer?.userId ?? null) : false,
+    live ? isSaved({ kind: "story", id: story.id }, viewer?.userId ?? null) : false,
     live ? listComments(story.id, viewer?.userId ?? null) : [],
     tagsForStory(story.id),
+    live ? alreadyReported({ kind: "story", id: story.id }, viewer?.userId ?? null) : false,
+    // Only for a story anyone can reach: a draft's place in a trip is the
+    // author's business, and the neighbours would be links they cannot use.
+    live ? placementsOf(story.id) : [],
   ]);
 
   const path = `/@${profile.handle}/${story.slug}`;
@@ -136,7 +161,18 @@ export default async function StoryPage({
       {/* What the author is looking at, when it is not the public page.
           Named per state rather than "Draft" for all three -- "only you can
           see this" is simply false for an unlisted story. */}
-      {isAuthor && !isListed(story.status) && (
+      {maySeeRemoved && story.removedAt && (
+        <div className="mb-10 rounded-xl border-2 border-dashed border-red-500/40 bg-red-500/5 px-4 py-3 text-sm">
+          <strong className="font-medium">Removed by a moderator.</strong>{" "}
+          <span className="text-muted">
+            {isAuthor
+              ? "Only you can see this page. Reply to the contact form if you think that is wrong."
+              : "Hidden from everyone but its author. You can see it because you moderate."}
+          </span>
+        </div>
+      )}
+
+      {isAuthor && !story.removedAt && !isListed(story.status) && (
         <div className="mb-10 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-accent/30 bg-accent-soft px-4 py-3 text-sm">
           <span>
             <strong className="font-medium">
@@ -234,6 +270,12 @@ export default async function StoryPage({
                 </p>
               )}
 
+              {/* Above the dates and the counts: landing mid-trip is the
+                  most useful thing this column can tell a reader, and it
+                  is shown even behind the read wall -- it is a reason to
+                  sign in, not something being withheld. */}
+              <TripAside placements={placements} />
+
               <dl className="mt-5 space-y-1.5 border-t border-rule pt-5 text-sm text-muted">
                 {story.publishedAt && (
                   <div>
@@ -268,6 +310,12 @@ export default async function StoryPage({
                     signedIn={Boolean(viewer)}
                     size="sm"
                   />
+                  <SaveButton
+                    target={{ kind: "story", id: story.id }}
+                    initialSaved={saved}
+                    signedIn={Boolean(viewer)}
+                    size="sm"
+                  />
                   <a
                     href="#comments"
                     className="text-sm text-muted transition-colors hover:text-accent"
@@ -289,6 +337,18 @@ export default async function StoryPage({
                 </ButtonLink>
               </div>
 
+              {/* Not offered to the author: they can take their own story
+                  down without involving anyone. */}
+              {live && !isAuthor && (
+                <p className="mt-6">
+                  <ReportButton
+                    target={{ kind: "story", id: story.id }}
+                    alreadyReported={reported}
+                    signedIn={Boolean(viewer)}
+                  />
+                </p>
+              )}
+
               {isAuthor && (
                 <p className="mt-6 text-sm text-muted">
                   <Link
@@ -307,6 +367,11 @@ export default async function StoryPage({
           </aside>
         </div>
       </article>
+
+      {/* Below the article, above the comments: finish the part, then go
+          to the next one. Hidden behind the wall for the same reason the
+          comments are. */}
+      {!walled && <TripNav placements={placements} />}
 
       {/* Not behind the wall: someone who has not read the story has
           nothing to say about it, and the comments would spoil what the

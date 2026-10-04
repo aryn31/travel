@@ -3,9 +3,15 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
+import { signOut } from "@/auth";
 import { db } from "@/lib/db";
 import { profiles, users } from "@/lib/db/schema";
 import { getViewer } from "@/lib/session";
+import {
+  confirmDeletion,
+  deletionBlock,
+  startDeletion,
+} from "@/lib/account";
 import { normalizeHandle } from "@/lib/handles";
 import { LIMITS, normalizeWebsite } from "@/lib/profile";
 import { checkPassword, hashPassword, verifyPassword } from "@/lib/password";
@@ -266,4 +272,74 @@ export async function setCoverPhoto(coverKey: string | null): Promise<CoverState
 
   revalidatePath("/", "layout");
   return { ok: true, coverKey };
+}
+
+
+/* ------------------------------------------------------------------ *
+ * Deleting the account
+ * ------------------------------------------------------------------ */
+
+export type DeleteState =
+  | { stage: "idle"; error?: string }
+  | { stage: "sent"; error?: string }
+  // `error` on every arm so a caller can read it without narrowing first;
+  // the "gone" arm never carries one, but typing it that way means the
+  // UI has to prove that on every render for nothing.
+  | { stage: "gone"; error?: undefined };
+
+/**
+ * Sends the code.
+ *
+ * Only ever for the signed-in account. There is no parameter for whose
+ * account to delete, which is the simplest possible way to make sure the
+ * answer is always "your own".
+ */
+export async function requestAccountDeletion(): Promise<DeleteState> {
+  const viewer = await getViewer();
+  if (!viewer) redirect("/signin");
+
+  if (!viewer.email) {
+    return {
+      stage: "idle",
+      error: "This account has no email address to send a code to.",
+    };
+  }
+
+  const blocked = await deletionBlock(viewer.userId);
+  if (blocked) return { stage: "idle", error: blocked };
+
+  const result = await startDeletion(viewer.userId, viewer.email);
+  if (!result.ok) return { stage: "idle", error: result.error };
+
+  return { stage: "sent" };
+}
+
+/** Checks the code and erases everything. */
+export async function confirmAccountDeletion(
+  _prev: DeleteState,
+  formData: FormData,
+): Promise<DeleteState> {
+  const viewer = await getViewer();
+  if (!viewer) redirect("/signin");
+
+  /*
+   * Re-checked, not trusted from the first step: a role can be granted
+   * between asking for the code and typing it in.
+   */
+  const blocked = await deletionBlock(viewer.userId);
+  if (blocked) return { stage: "sent", error: blocked };
+
+  const result = await confirmDeletion(
+    viewer.userId,
+    String(formData.get("code") ?? ""),
+  );
+  if (!result.ok) return { stage: "sent", error: result.error };
+
+  /*
+   * The session row went with the account, so the cookie now points at
+   * nothing. Clearing it properly means the next page does not spend a
+   * query discovering that.
+   */
+  await signOut({ redirect: false });
+  return { stage: "gone" };
 }

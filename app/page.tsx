@@ -1,7 +1,8 @@
-import { desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { media, profiles, stories } from "@/lib/db/schema";
-import { getViewer } from "@/lib/session";
+import { getViewer, isModerator } from "@/lib/session";
+import { recentActivity, siteSummary } from "@/lib/reports";
 import { publicUrl } from "@/lib/storage";
 import { firstQuote } from "@/lib/story-doc";
 import { StoryList } from "@/components/StoryList";
@@ -13,12 +14,39 @@ import { RotatingSeal } from "@/components/home/RotatingSeal";
 import { QuoteBreak } from "@/components/home/QuoteBreak";
 import { WritersRow } from "@/components/home/WritersRow";
 import { WriteInvite } from "@/components/home/WriteInvite";
+import { AdminHome } from "@/components/home/AdminHome";
 import { ButtonLink } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Reveal } from "@/components/Reveal";
 
-export default async function Home() {
+export default async function Home({ searchParams }: PageProps<"/">) {
   const viewer = await getViewer();
+
+  /*
+   * A moderator gets a different page, not the same one with a panel
+   * bolted on. The reader's home is an argument for reading -- a
+   * full-height photograph, a lead story, a pull quote, an invitation to
+   * write -- and none of that is what somebody running the site opened it
+   * for.
+   *
+   * `?view=public` escapes back to it: the person running a site has to
+   * be able to look at the thing everybody else sees, and without this
+   * they would be the only person who never could.
+   */
+  const sp = await searchParams;
+  if (isModerator(viewer) && viewer?.profile && sp.view !== "public") {
+    const [summary, activity] = await Promise.all([
+      siteSummary(),
+      recentActivity(),
+    ]);
+    return (
+      <AdminHome
+        handle={viewer.profile.handle}
+        summary={summary}
+        activity={activity}
+      />
+    );
+  }
 
   const rows = await db
     .select({
@@ -42,14 +70,18 @@ export default async function Home() {
     .from(stories)
     .innerJoin(profiles, eq(profiles.userId, stories.authorId))
     .leftJoin(media, eq(media.id, stories.coverMediaId))
-    .where(eq(stories.status, "published"))
+    .where(and(eq(stories.status, "published"), isNull(stories.removedAt)))
     .orderBy(desc(stories.publishedAt))
     .limit(24);
 
   const recent = rows.map((r) => ({
     ...r,
     cover: r.coverKey
-      ? { url: publicUrl(r.coverKey), width: r.coverWidth!, height: r.coverHeight! }
+      ? {
+          url: publicUrl(r.coverKey),
+          width: r.coverWidth!,
+          height: r.coverHeight!,
+        }
       : null,
   }));
 
@@ -60,7 +92,7 @@ export default async function Home() {
     })
     .from(stories)
     .where(
-      sql`${stories.status} = 'published' and ${stories.countryCode} is not null`,
+      sql`${stories.status} = 'published' and ${stories.removedAt} is null and ${stories.countryCode} is not null`,
     )
     .groupBy(stories.countryCode)
     .orderBy(desc(sql`count(*)`))
@@ -81,7 +113,7 @@ export default async function Home() {
     .from(profiles)
     .innerJoin(
       stories,
-      sql`${stories.authorId} = ${profiles.userId} and ${stories.status} = 'published'`,
+      sql`${stories.authorId} = ${profiles.userId} and ${stories.status} = 'published' and ${stories.removedAt} is null`,
     )
     .groupBy(
       profiles.handle,
@@ -93,6 +125,11 @@ export default async function Home() {
     .orderBy(desc(sql`count(${stories.id})`))
     .limit(4);
 
+  /*
+   * A staff account cannot write, so "Write a story" is an invitation to
+   * a page it has no business on. The rest of the page is unchanged: a
+   * moderator is a reader first, and the site is not a dashboard.
+   */
   const cta = !viewer
     ? { href: "/signin", label: "Start writing" }
     : viewer.profile
@@ -135,8 +172,8 @@ export default async function Home() {
             <span className="block text-accent">The telling is the rest.</span>
           </h1>
           <p className="mt-6 max-w-lg text-lg leading-relaxed text-foreground/80">
-            Long-form writing about where you went and what it was actually
-            like — with the photographs that belong to it.
+            Long-form writing about where you went and what it was actually like
+            — with the photographs that belong to it.
           </p>
 
           <div className="mt-9 flex flex-wrap items-center gap-4">
@@ -181,7 +218,10 @@ export default async function Home() {
               colour here, and a tint behind them would fight. */}
           <section id="latest" className="page pt-16">
             <div className="mb-8 flex items-baseline gap-4">
-              <span aria-hidden className="font-display numeral-outline text-4xl font-semibold leading-none">
+              <span
+                aria-hidden
+                className="font-display numeral-outline text-4xl font-semibold leading-none"
+              >
                 01
               </span>
               <h2 className="eyebrow">The latest</h2>
@@ -207,14 +247,14 @@ export default async function Home() {
             <section>
               <div>
                 <Reveal>
-                <QuoteBreak
-                  quote={quote}
-                  title={quoted.title}
-                  href={`/@${quoted.handle}/${quoted.slug}`}
-                  authorName={quoted.displayName}
-                  authorHandle={quoted.handle}
-                  authorAvatarKey={quoted.avatarKey}
-                />
+                  <QuoteBreak
+                    quote={quote}
+                    title={quoted.title}
+                    href={`/@${quoted.handle}/${quoted.slug}`}
+                    authorName={quoted.displayName}
+                    authorHandle={quoted.handle}
+                    authorAvatarKey={quoted.avatarKey}
+                  />
                 </Reveal>
               </div>
             </section>
@@ -223,7 +263,10 @@ export default async function Home() {
           {remainder.length > 0 && (
             <section className="page pt-16">
               <div className="mb-8 flex items-baseline gap-4">
-                <span aria-hidden className="font-display numeral-outline text-4xl font-semibold leading-none">
+                <span
+                  aria-hidden
+                  className="font-display numeral-outline text-4xl font-semibold leading-none"
+                >
                   02
                 </span>
                 <h2 className="eyebrow">More stories</h2>

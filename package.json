@@ -18,7 +18,10 @@
     "storage:migrate": "tsx --env-file=.env.local scripts/migrate-storage.ts",
     "storage:fixkeys": "tsx --env-file=.env.local scripts/fix-media-keys.ts",
     "photo": "tsx --env-file=.env.local scripts/photo-preview.ts",
-    "seed:social": "tsx --env-file=.env.local scripts/seed-social.ts"
+    "seed:social": "tsx --env-file=.env.local scripts/seed-social.ts",
+    "admin": "tsx --env-file=.env.local scripts/grant-admin.ts",
+    "admin:create": "tsx --env-file=.env.local scripts/create-admin.ts",
+    "audit:urls": "tsx --env-file=.env.local scripts/audit-urls.ts"
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.11.3",

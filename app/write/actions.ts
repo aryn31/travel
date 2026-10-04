@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { media, profiles, stories } from "@/lib/db/schema";
 import type { Story } from "@/lib/db/schema";
-import { getViewer } from "@/lib/session";
+import { getViewer, isModerator } from "@/lib/session";
 import { slugForTitle } from "@/lib/stories";
 import { docToSummary, docToText, isDoc, readingMinutes } from "@/lib/story-doc";
 import { remove as removeFromStorage } from "@/lib/storage";
@@ -60,6 +60,15 @@ function isLocked(story: Story): boolean {
 }
 
 export async function createDraft() {
+  /*
+   * Checked here as well as on the page. The page not rendering is a
+   * routing decision; this is the call that creates a row, and a Server
+   * Action is reachable without ever loading the page in front of it.
+   */
+  {
+    const viewer = await getViewer();
+    if (isModerator(viewer)) redirect("/admin");
+  }
   const viewer = await getViewer();
   if (!viewer) redirect("/signin");
   if (!viewer.profile) redirect("/onboarding");

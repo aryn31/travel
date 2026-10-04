@@ -1,6 +1,7 @@
 import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "./db";
-import { comments, profiles, stories } from "./db/schema";
+import { comments, profiles, reports, stories, users } from "./db/schema";
+import { notify } from "./notifications";
 
 /**
  * Comments, one level deep.
@@ -52,9 +53,11 @@ export async function listComments(
       handle: profiles.handle,
       displayName: profiles.displayName,
       avatarKey: profiles.avatarKey,
+      role: users.role,
     })
     .from(comments)
     .innerJoin(profiles, eq(profiles.userId, comments.authorId))
+    .innerJoin(users, eq(users.id, comments.authorId))
     .where(eq(comments.storyId, storyId))
     .orderBy(asc(comments.createdAt));
 
@@ -65,16 +68,42 @@ export async function listComments(
    */
   const ownsStory = Boolean(viewerId && story && story.authorId === viewerId);
 
+  /*
+   * Which of these the viewer has already reported, in one query. Asking
+   * per comment would be a round trip each, and the answer only changes
+   * what a button says.
+   */
+  const reportedIds = new Set<string>();
+  if (viewerId && rows.length > 0) {
+    const mine = await db
+      .select({ commentId: reports.commentId })
+      .from(reports)
+      .where(
+        and(
+          eq(reports.reporterId, viewerId),
+          inArray(reports.commentId, rows.map((r) => r.id)),
+        ),
+      );
+    for (const m of mine) if (m.commentId) reportedIds.add(m.commentId);
+  }
+
   const node = (r: (typeof rows)[number]): CommentNode => ({
     id: r.id,
     body: r.deletedAt ? "" : r.body,
     createdAt: r.createdAt,
     author: r.deletedAt
       ? null
-      : { handle: r.handle, displayName: r.displayName, avatarKey: r.avatarKey },
+      : {
+          handle: r.handle,
+          displayName: r.displayName,
+          avatarKey: r.avatarKey,
+          role: r.role,
+        },
     deleted: Boolean(r.deletedAt),
     canDelete:
       !r.deletedAt && Boolean(viewerId) && (ownsStory || r.authorId === viewerId),
+    mine: r.authorId === viewerId,
+    reported: reportedIds.has(r.id),
     replies: [],
   });
 
@@ -120,12 +149,14 @@ export async function addComment({
    * author, so a comment on one arrived by guessing an id.
    */
   const [story] = await db
-    .select({ id: stories.id })
+    .select({ id: stories.id, authorId: stories.authorId })
     .from(stories)
     .where(
       and(
         eq(stories.id, storyId),
         inArray(stories.status, ["published", "unlisted"]),
+        // A removed story takes its comment box with it.
+        isNull(stories.removedAt),
       ),
     )
     .limit(1);
@@ -141,9 +172,14 @@ export async function addComment({
    * graft a comment from one story onto another.
    */
   let root: string | null = null;
+  let repliedTo: string | null = null;
   if (parentId) {
     const [parent] = await db
-      .select({ id: comments.id, parentId: comments.parentId })
+      .select({
+        id: comments.id,
+        parentId: comments.parentId,
+        authorId: comments.authorId,
+      })
       .from(comments)
       .where(
         and(
@@ -155,9 +191,10 @@ export async function addComment({
       .limit(1);
     if (!parent) return null;
     root = parent.parentId ?? parent.id;
+    repliedTo = parent.authorId;
   }
 
-  return db.transaction(async (tx) => {
+  const id = await db.transaction(async (tx) => {
     const [row] = await tx
       .insert(comments)
       .values({ storyId, authorId, body, parentId: root })
@@ -170,6 +207,35 @@ export async function addComment({
 
     return row.id;
   });
+
+  /*
+   * Two people can care about one comment: whoever wrote the story, and
+   * whoever is being replied to. Both are told, and notify() drops the
+   * case where they are the same person as the commenter.
+   *
+   * Told once, not twice: an author replying to a comment on their own
+   * story would otherwise get a reply notification and a comment one for
+   * the same sentence.
+   */
+  await notify({
+    userId: story.authorId,
+    actorId: authorId,
+    kind: "comment",
+    storyId,
+    commentId: id,
+  });
+
+  if (repliedTo && repliedTo !== story.authorId) {
+    await notify({
+      userId: repliedTo,
+      actorId: authorId,
+      kind: "reply",
+      storyId,
+      commentId: id,
+    });
+  }
+
+  return id;
 }
 
 /**

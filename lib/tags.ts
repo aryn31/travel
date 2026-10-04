@@ -149,7 +149,7 @@ export async function popularTags(limit = 12): Promise<StoryTag[]> {
     .from(storyTags)
     .innerJoin(tags, eq(tags.id, storyTags.tagId))
     .innerJoin(stories, eq(stories.id, storyTags.storyId))
-    .where(sql`${stories.status} = 'published'`)
+    .where(sql`${stories.status} = 'published' and ${stories.removedAt} is null`)
     .groupBy(tags.slug, tags.label)
     .orderBy(sql`count(*) desc`, tags.label)
     .limit(limit);
