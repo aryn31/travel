@@ -201,6 +201,12 @@ export async function verifySignup(
         // Proved by the code that just checked out -- which is the whole
         // point of making them wait for it.
         emailVerified: new Date(),
+        /*
+         * Stamped here rather than when the form was submitted: the
+         * account did not exist until now, and the thing worth recording
+         * is that the person who owns this address agreed.
+         */
+        termsAcceptedAt: new Date(),
       })
       .returning({ id: users.id });
   } catch (err) {

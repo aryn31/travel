@@ -98,6 +98,29 @@ export default async function SettingsPage() {
         <PasswordForm hasPassword={viewer.hasPassword} />
       </section>
 
+      <section className="page border-t border-rule py-12">
+        <div className="mb-6 flex items-baseline gap-4">
+          <h2 className="eyebrow">Your data</h2>
+          <span aria-hidden className="h-px flex-1 bg-rule" />
+        </div>
+        <div className="max-w-xl">
+          <p className="text-sm text-muted">
+            Everything you have written, in one file: stories with their
+            full documents, trips, comments, and a list of your
+            photographs. Yours to keep whether or not you stay.
+          </p>
+          {/* A plain link, not a fetch-and-blob dance: the route sets
+              Content-Disposition and the browser does the rest. */}
+          <a
+            href="/api/export"
+            download
+            className="mt-4 inline-flex rounded-full border-2 border-rule px-5 py-2 text-sm font-medium transition-colors hover:border-accent hover:text-accent"
+          >
+            Download everything
+          </a>
+        </div>
+      </section>
+
       <section className="page border-t border-rule py-12 pb-24">
         <div className="mb-6 flex items-baseline gap-4">
           <h2 className="eyebrow">Leaving</h2>

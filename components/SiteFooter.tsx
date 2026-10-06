@@ -83,6 +83,19 @@ export function SiteFooter() {
               >
                 Contact us
               </Link>
+              {/* The three a reader is entitled to find without asking. */}
+              <Link href="/terms" className="transition-colors hover:text-foreground">
+                Terms
+              </Link>
+              <Link href="/privacy" className="transition-colors hover:text-foreground">
+                Privacy
+              </Link>
+              <Link
+                href="/content-policy"
+                className="transition-colors hover:text-foreground"
+              >
+                House rules
+              </Link>
               <span>Set in Fraunces and Geist.</span>
             </p>
             {/* The seeded photographs come from Commons under CC licences,

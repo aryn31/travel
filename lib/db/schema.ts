@@ -38,6 +38,17 @@ export const users = pgTable("users", {
   role: text("role", { enum: ["user", "editor", "admin"] })
     .notNull()
     .default("user"),
+
+  /*
+   * When this person accepted the terms.
+   *
+   * A timestamp rather than a boolean: "they agreed" is a claim that has
+   * to survive being questioned, and the useful part is when. Null for
+   * every account that existed before the terms did -- those people
+   * agreed to nothing, and recording otherwise would be a lie told by a
+   * default value.
+   */
+  termsAcceptedAt: timestamp("terms_accepted_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

@@ -55,16 +55,54 @@ export default async function ContactPage() {
               <div>
                 <dt className="font-medium">Something wrong with a story?</dt>
                 <dd className="mt-1 text-muted">
-                  Send us the link. We read every one of these.
+                  Every story, trip and comment has a{" "}
+                  <strong className="font-medium text-foreground">Report</strong>{" "}
+                  link — that reaches the moderation queue directly, which is
+                  faster than this form.
                 </dd>
               </div>
               <div>
                 <dt className="font-medium">Want your account deleted?</dt>
                 <dd className="mt-1 text-muted">
-                  Ask here and we&apos;ll do it — your stories go with it.
+                  You can do it yourself in{" "}
+                  <Link href="/settings" className="text-accent underline underline-offset-2">
+                    settings
+                  </Link>
+                  , and download everything first.
                 </dd>
               </div>
             </dl>
+          </div>
+          {/*
+            Its own block rather than a line in the list above. A copyright
+            claim is a formal thing with required contents, and burying it
+            among "can't sign in?" would mean the first few arrive missing
+            half of what is needed.
+          */}
+          <div className="mt-6 rounded-2xl border-2 border-dashed border-rule p-6">
+            <h2 className="font-display text-xl font-semibold">
+              Copyright claims
+            </h2>
+            <p className="mt-3 text-sm leading-relaxed text-muted">
+              If something here is your work, published without your
+              permission, send a notice through this form with{" "}
+              <strong className="font-medium text-foreground">
+                “Copyright”
+              </strong>{" "}
+              as the first word.
+            </p>
+            <p className="mt-3 text-sm leading-relaxed text-muted">
+              Include: a link to the page, enough about the original for us
+              to identify it, your contact details, a statement that you
+              believe in good faith the use is unauthorised, and a statement
+              that the notice is accurate and you are the owner or
+              authorised to act for them.
+            </p>
+            <p className="mt-3 text-sm leading-relaxed text-muted">
+              Material is taken down while it is looked at. If yours was
+              removed and you think that was wrong, reply the same way and
+              say so — a person reads it.
+            </p>
           </div>
         </aside>
       </section>

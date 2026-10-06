@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { useActionState, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Field, inputClass } from "@/components/ui/Field";
@@ -44,6 +46,30 @@ export function SignUpForm({ next = "" }: { next?: string }) {
       onSubmit={() => setRestarted(false)}
       className="flex flex-col gap-5"
     >
+      {/*
+        Stated above the fields, not buried under the button. Somebody
+        should know what they are agreeing to before they start typing,
+        and a checkbox nobody reads is worth less than a sentence they do.
+      */}
+      <p className="text-sm leading-relaxed text-muted">
+        Making an account means agreeing to the{" "}
+        <Link href="/terms" className="text-accent underline underline-offset-2">
+          terms
+        </Link>
+        ,{" "}
+        <Link href="/privacy" className="text-accent underline underline-offset-2">
+          privacy policy
+        </Link>{" "}
+        and{" "}
+        <Link
+          href="/content-policy"
+          className="text-accent underline underline-offset-2"
+        >
+          house rules
+        </Link>
+        . They are short.
+      </p>
+
       <Field
         label="Email address"
         htmlFor="email"
